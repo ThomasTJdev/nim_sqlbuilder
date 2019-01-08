@@ -1,10 +1,18 @@
-# Copyright 2018 - Thomas T. Jarløv
+# Copyright 2019 - Thomas T. Jarløv
+##
+## SQL builder
+## ----------
+##
 ## SQL builder for ``INSERT``, ``UPDATE``, ``SELECT`` and ``DELETE`` queries.
 ## The builder will check for NULL values and build a query with them.
 ##
 ## After Nim's update to 0.19.0, the check for NULL values has been removed
 ## due to the removal of ``nil``. This library's main goal is to allow the
 ## user, to insert NULL values into the database again.
+##
+## This packages uses Nim's standard packages, e.g. db_postgres,
+## proc to escape qoutes.
+##
 ##
 ## NULL values
 ## -------
@@ -13,13 +21,13 @@
 ## A NULL value
 ## ============
 ##
-## The global var ``dbNullVal`` represents a NULL value. Use ``dbNullVal``
+## The global ``var dbNullVal`` represents a NULL value. Use ``dbNullVal``
 ## in your args, if you need to insert/update to a NULL value.
 ##
 ## Insert value or NULL
 ## ============
 ##
-## The global proc ``dbValOrNull()`` will check, if it's contain a value
+## The global ``proc dbValOrNull()`` will check, if it's contain a value
 ## or is empty. If it contains a value, the value will be used in the args,
 ## otherwise a NULL value (``dbNullVal``) will be used.
 ##
@@ -32,30 +40,41 @@
 ## The examples below support the various DB commands such as ``exec``,
 ## ``tryExec``, ``insertID``, ``tryInsertID``, etc.
 ##
-## Examples (general)
+##
+## Examples (NULL values)
 ## -------
+##
 ##
 ## All the examples uses a table named: ``myTable`` and they use the WHERE argument on: ``name``.
 ##
-## Insert string & int
+## Update string & int
 ## =====================
 ##
+## ### Version 1
+## *Required if NULL values could be expected*
 ## .. code-block:: Nim
 ##    let a = genArgs("em@em.com", 20, "John")
 ##    exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
 ##    # ==> string, int
 ##    # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
 ##
-## Insert NULL & int
+##
+## ### Version 2
+## .. code-block:: Nim
+##    exec(db, sqlUpdate("myTable", ["email", "age"], ["name"]), "em@em.com", 20, "John")
+##    # ==> string, int
+##    # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
+##
+## Update NULL & int
 ## =====================
 ##
 ## .. code-block:: Nim
-##    a = genArgs("", 20, "John")
+##    let a = genArgs("", 20, "John")
 ##    exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
 ##    # ==> NULL, int
 ##    # ==> UPDATE myTable SET email = NULL, age = ? WHERE name = ?
 ##
-## Insert string & NULL
+## Update string & NULL
 ## =====================
 ##
 ## .. code-block:: Nim
@@ -64,12 +83,12 @@
 ##    # ==> string, NULL
 ##    # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
 ##
-## Error: Insert string & NULL
+## Error: Update string & NULL
 ## =====================
 ##
-## An empty string, "", will be inserted into the database, which is not allowed
-## for a int-field. You therefore need to use the ``dbValOrNull()`` or
-## ``dbNullVal`` for ``integers``.
+## An empty string, "", will be inserted into the database as NULL.
+## Empty string cannot be used for an INTEGER column. You therefore
+## need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
 ##
 ## .. code-block:: Nim
 ##    a = genArgs("aa@aa.aa", "", "John")
@@ -79,8 +98,7 @@
 ##    # ==> To insert a NULL into a int-field, it is required to use dbValOrNull()
 ##    #     or dbNullVal, it is only possible to pass and empty string.
 ##
-##
-## Insert NULL & NULL
+## Update NULL & NULL
 ## =====================
 ##
 ## .. code-block:: Nim
@@ -90,6 +108,16 @@
 ##    # ==> NULL, NULL
 ##    # ==> UPDATE myTable SET email = NULL, age = NULL WHERE name = ?
 ##
+##
+## Update unknow value - maybe NULL
+## =====================
+##
+## .. code-block:: Nim
+##    a = genArgs(dbValOrNull(stringVar), dbValOrNull(intVar), "John")
+##    exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+##    # ==> NULL, NULL -or- STRING, INT
+##
+##
 ## Examples (INSERT)
 ## -------
 ##
@@ -97,8 +125,9 @@
 ## =====================
 ##
 ## .. code-block:: Nim
-##    exec(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
-##    insertID(db, sqlInsert("myTable", ["email", "age"]), "John", 20)
+##    exec(db, sqlInsert("myTable", ["email", "age"]), "em@em.com" , 20)
+##    # OR
+##    insertID(db, sqlInsert("myTable", ["email", "age"]), "em@em.com", 20)
 ##    # ==> INSERT INTO myTable (email, age) VALUES (?, ?)
 ##
 ## Insert with NULL
@@ -107,6 +136,7 @@
 ## .. code-block:: Nim
 ##    let a = genArgs("em@em.com", dbNullVal)
 ##    exec(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
+##    # OR
 ##    insertID(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
 ##    # ==> INSERT INTO myTable (email) VALUES (?)
 ##
@@ -170,6 +200,9 @@
 ##    # FROM myTable LEFT JOIN company ON company.email = myTable.email
 ##    # WHERE company.name = NULL AND myTable.age IN (20,22,24)
 ##    # ORDER BY myTable.email
+##
+## # Credit
+## Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
 
 import strutils, db_postgres
 
@@ -182,8 +215,10 @@ type
     query*: seq[ArgObj]
     args*: seq[string]
 
+
 var dbNullVal*: ArgObj ## Global NULL value
 dbNullVal.isNull = true
+
 
 proc argType*(v: ArgObj): ArgObj =
   ## Checks if a ``ArgObj`` is NULL and return
@@ -194,12 +229,14 @@ proc argType*(v: ArgObj): ArgObj =
   else:
     return v
 
+
 proc argType*(v: string | int): ArgObj =
   ## Transforms a string or int to a ``ArgObj``
   var arg: ArgObj
   arg.isNull = false
   arg.val = $v
   return arg
+
 
 proc dbValOrNull*(v: string | int): ArgObj =
   ## Return NULL obj if len() == 0, else return value obj
@@ -209,6 +246,7 @@ proc dbValOrNull*(v: string | int): ArgObj =
   arg.val = $v
   arg.isNull = false
   return arg
+
 
 template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
   ## Create argument container for query and passed args
@@ -224,9 +262,11 @@ template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
       argsContainer.args.add(argObject.val)
   argsContainer
 
+
 proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for INSERT queries
   ## Checks for NULL values
+
   var fields = "INSERT INTO " & table & " ("
   var vals = ""
   for i, d in data:
@@ -239,6 +279,7 @@ proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query)
     vals.add('?')
 
   result = sql(fields & ") VALUES (" & vals & ")")
+
 
 proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
   ## SQL builder for INSERT queries
@@ -255,9 +296,11 @@ proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
 
   result = sql(fields & ") VALUES (" & vals & ")")
 
+
 proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for UPDATE queries
   ## Checks for NULL values
+
   var fields = "UPDATE " & table & " SET "
   for i, d in data:
     if i > 0:
@@ -277,6 +320,7 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], ar
 proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): SqlQuery =
   ## SQL builder for UPDATE queries
   ## Does NOT check for NULL values
+
   var fields = "UPDATE " & table & " SET "
   for i, d in data:
     if i > 0:
@@ -290,9 +334,11 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): S
 
   result = sql(fields & wes)
 
+
 proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
   ## SQL builder for DELETE queries
   ## Does NOT check for NULL values
+
   var res = "DELETE FROM " & table
   var wes = " WHERE "
   for i, d in where:
@@ -302,9 +348,11 @@ proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
 
   result = sql(res & wes)
 
+
 proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for DELETE queries
   ## Checks for NULL values
+
   var res = "DELETE FROM " & table
   var wes = " WHERE "
   for i, d in where:
@@ -317,9 +365,11 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
 
   result = sql(res & wes)
 
+
 proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string): SqlQuery =
   ## SQL builder for SELECT queries
   ## Does NOT check for NULL values
+
   var res = "SELECT "
   for i, d in data:
     if i > 0: res.add(", ")
@@ -351,9 +401,11 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
 
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 
+
 proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string, args: ArgsContainer.query): SqlQuery =
   ## SQL builder for SELECT queries
   ## Checks for NULL values
+
   var res = "SELECT "
   for i, d in data:
     if i > 0: res.add(", ")
