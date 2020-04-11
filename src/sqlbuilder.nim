@@ -204,7 +204,8 @@
 ## # Credit
 ## Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
 
-import strutils, db_postgres
+import strutils, db_postgres, macros
+from times import epochTime
 
 type
   ArgObj* = object ## Argument object
@@ -216,8 +217,7 @@ type
     args*: seq[string]
 
 
-var dbNullVal*: ArgObj ## Global NULL value
-dbNullVal.isNull = true
+const dbNullVal* = ArgObj(isNull: true) ## Global NULL value
 
 
 proc argType*(v: ArgObj): ArgObj =
@@ -263,179 +263,87 @@ template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
   argsContainer
 
 
-proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query): SqlQuery =
-  ## SQL builder for INSERT queries
-  ## Checks for NULL values
-
-  var fields = "INSERT INTO " & table & " ("
-  var vals = ""
-  for i, d in data:
-    if args[i].isNull:
-      continue
-    if i > 0:
-      fields.add(", ")
-      vals.add(", ")
-    fields.add(d)
-    vals.add('?')
-
-  result = sql(fields & ") VALUES (" & vals & ")")
+include sqlbuilder/insert
+include sqlbuilder/update
+include sqlbuilder/delete
+include sqlbuilder/select
 
 
-proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
-  ## SQL builder for INSERT queries
-  ## Does NOT check for NULL values
+when isMainModule:
 
-  var fields = "INSERT INTO " & table & " ("
-  var vals = ""
-  for i, d in data:
-    if i > 0:
-      fields.add(", ")
-      vals.add(", ")
-    fields.add(d)
-    vals.add('?')
+  let a = epochTime()
+  for i in countup(0,100000):
+    let a = sqlSelectMacro("myTable", ["id", "name", "j"], [""], ["email =", "name ="], "", "", "")
 
-  result = sql(fields & ") VALUES (" & vals & ")")
+  let b = epochTime()
 
+  let c = epochTime()
+  for i in countup(0,100000):
+    let a = sqlSelect("myTable", ["id", "name", "j"], [""], ["email =", "name ="], "", "", "")
 
-proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], args: ArgsContainer.query): SqlQuery =
-  ## SQL builder for UPDATE queries
-  ## Checks for NULL values
+  let d = epochTime()
 
-  var fields = "UPDATE " & table & " SET "
-  for i, d in data:
-    if i > 0:
-      fields.add(", ")
-    if args[i].isNull:
-      fields.add(d & " = NULL")
-    else:
-      fields.add(d & " = ?")
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(d & " = ?")
+  echo "Select:"
+  echo "Macro:  " & $(b-a)
+  echo "Normal: " & $(d-c)
+  echo "Diff:   " & $((d-c) - (b-a))
 
-  result = sql(fields & wes)
-
-proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): SqlQuery =
-  ## SQL builder for UPDATE queries
-  ## Does NOT check for NULL values
-
-  var fields = "UPDATE " & table & " SET "
-  for i, d in data:
-    if i > 0:
-      fields.add(", ")
-    fields.add(d & " = ?")
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(d & " = ?")
-
-  result = sql(fields & wes)
+  echo "\n\n"
 
 
-proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
-  ## SQL builder for DELETE queries
-  ## Does NOT check for NULL values
+  let im1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlInsertMacro("myTable", ["id", "name", "j"])
 
-  var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(d & " = ?")
+  let im2 = epochTime()
 
-  result = sql(res & wes)
+  let ip1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlInsert("myTable", ["id", "name", "j"])
 
+  let ip2 = epochTime()
 
-proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query): SqlQuery =
-  ## SQL builder for DELETE queries
-  ## Checks for NULL values
+  echo "Update:"
+  echo "Macro:  " & $(im2-im1)
+  echo "Normal: " & $(ip2-ip1)
+  echo "Diff:   " & $((ip2-ip1) - (im2-im1))
 
-  var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    if args[i].isNull:
-      wes.add(d & " = NULL")
-    else:
-      wes.add(d & " = ?")
-
-  result = sql(res & wes)
+  echo "\n\n"
 
 
-proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string): SqlQuery =
-  ## SQL builder for SELECT queries
-  ## Does NOT check for NULL values
+  let um1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlUpdateMacro("myTable", ["id", "name", "j"], ["id", "session"])
 
-  var res = "SELECT "
-  for i, d in data:
-    if i > 0: res.add(", ")
-    res.add(d)
-  var lef = ""
-  for i, d in left:
-    if d != "":
-      lef.add(" LEFT JOIN ")
-      lef.add(d)
-  var wes = ""
-  for i, d in whereC:
-    if d != "" and i == 0:
-      wes.add(" WHERE ")
-    if i > 0:
-      wes.add(" AND ")
-    if d != "":
-      wes.add(d & " ?")
-  var acc = ""
-  if access != "":
-    if wes.len == 0:
-      acc.add(" WHERE " & accessC & " in ")
-      acc.add("(")
-    else:
-      acc.add(" AND " & accessC & " in (")
-    for a in split(access, ","):
-      acc.add(a & ",")
-    acc = acc[0 .. ^2]
-    acc.add(")")
+  let um2 = epochTime()
 
-  result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
+  let up1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlUpdate("myTable", ["id", "name", "j"], ["id", "session"])
+
+  let up2 = epochTime()
+
+  echo "Update:"
+  echo "Macro:  " & $(um2-um1)
+  echo "Normal: " & $(up2-up1)
+  echo "Diff:   " & $((up2-up1) - (um2-um1))
+
+  echo "\n\n"
 
 
-proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string, args: ArgsContainer.query): SqlQuery =
-  ## SQL builder for SELECT queries
-  ## Checks for NULL values
+  let dm1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlDeleteMacro("myTable", ["id", "name", "j"])
 
-  var res = "SELECT "
-  for i, d in data:
-    if i > 0: res.add(", ")
-    res.add(d)
-  var lef = ""
-  for i, d in left:
-    if d != "":
-      lef.add(" LEFT JOIN ")
-      lef.add(d)
-  var wes = ""
-  for i, d in whereC:
-    if d != "" and i == 0:
-      wes.add(" WHERE ")
-    if i > 0:
-      wes.add(" AND ")
-    if d != "":
-      if args[i].isNull:
-        wes.add(d & " = NULL")
-      else:
-        wes.add(d & " ?")
-  var acc = ""
-  if access != "":
-    if wes.len == 0:
-      acc.add(" WHERE " & accessC & " in ")
-      acc.add("(")
-    else:
-      acc.add(" AND " & accessC & " in (")
-    for a in split(access, ","):
-      acc.add(a & ",")
-    acc = acc[0 .. ^2]
-    acc.add(")")
+  let dm2 = epochTime()
 
-  result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
+  let dp1 = epochTime()
+  for i in countup(0,100000):
+    let a = sqlDelete("myTable", ["id", "name", "j"])
+
+  let dp2 = epochTime()
+
+  echo "Delete:"
+  echo "Macro:  " & $(dm2-dm1)
+  echo "Normal: " & $(dp2-dp1)
+  echo "Diff:   " & $((dp2-dp1) - (dm2-dm1))
