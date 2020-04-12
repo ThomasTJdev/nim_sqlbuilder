@@ -216,8 +216,7 @@ type
     args*: seq[string]
 
 
-var dbNullVal*: ArgObj ## Global NULL value
-dbNullVal.isNull = true
+const dbNullVal* = ArgObj(isNull: true) ## Global NULL value
 
 
 proc argType*(v: ArgObj): ArgObj =
