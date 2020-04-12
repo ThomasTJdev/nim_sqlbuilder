@@ -14,6 +14,14 @@ This packages uses Nim's standard packages, e.g. db_postgres,
 proc to escape qoutes.
 
 
+# Macro generated queries
+ 
+The library supports generating the queries with a macro, which improves the
+performance due to query being generated on compile time. The macro generated
+queries **do not** accept the `genArgs()` - so there's currently not NULL-
+support.
+
+
 # NULL values
 
 

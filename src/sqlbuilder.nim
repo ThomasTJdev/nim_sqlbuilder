@@ -14,6 +14,15 @@
 ## proc to escape qoutes.
 ##
 ##
+## Macro generated queries
+## --------
+## 
+## The library supports generating the queries with a macro, which improves the
+## performance due to query being generated on compile time. The macro generated
+## queries **do not** accept the `genArgs()` - so there's currently not NULL-
+## support.
+##
+##
 ## NULL values
 ## -------
 ##
@@ -263,10 +272,10 @@ template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
   argsContainer
 
 
-include sqlbuilder/insert
-include sqlbuilder/update
-include sqlbuilder/delete
-include sqlbuilder/select
+include sqlbuilderpkg/insert
+include sqlbuilderpkg/update
+include sqlbuilderpkg/delete
+include sqlbuilderpkg/select
 
 
 when isMainModule:
