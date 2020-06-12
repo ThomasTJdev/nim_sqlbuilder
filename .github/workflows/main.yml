@@ -30,11 +30,11 @@ jobs:
     - name: Print Nimble version
       run: nimble -v
 
-    - name: Nimble Refresh
-      run: nimble -y refresh
+    #- name: Nimble Refresh
+    #  run: nimble -y refresh
 
-    - name: Nimble Install dependencies
-      run: nimble -y install --depsOnly
+    #- name: Nimble Install dependencies
+    #  run: nimble -y install --depsOnly
 
     - name: Build binaries
-      run: nimble build -d:release
+      run: nimble install -d:release
