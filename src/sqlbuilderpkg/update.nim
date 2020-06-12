@@ -19,7 +19,11 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], ar
       wes.add(" AND ")
     wes.add(d & " = ?")
 
+  when defined(testSqlquery):
+    echo fields & wes
+
   result = sql(fields & wes)
+
 
 proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): SqlQuery =
   ## SQL builder for UPDATE queries
@@ -35,6 +39,9 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): S
     if i > 0:
       wes.add(" AND ")
     wes.add(d & " = ?")
+
+  when defined(testSqlquery):
+    echo fields & wes
 
   result = sql(fields & wes)
 
@@ -53,5 +60,8 @@ macro sqlUpdateMacro*(table: string, data: varargs[string], where: varargs[strin
     if i > 0:
       wes.add(" AND ")
     wes.add($d & " = ?")
+
+  when defined(testSqlquery):
+    echo fields & wes
 
   result = parseStmt("sql(\"" & fields & wes & "\")")

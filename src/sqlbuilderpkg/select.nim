@@ -33,6 +33,9 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
     acc = acc[0 .. ^2]
     acc.add(")")
 
+  when defined(testSqlquery):
+    echo res & " FROM " & table & lef & wes & acc & " " & user
+
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 
 
@@ -72,6 +75,9 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
     acc = acc[0 .. ^2]
     acc.add(")")
 
+  when defined(testSqlquery):
+    echo res & " FROM " & table & lef & wes & acc & " " & user
+
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 
 
@@ -109,5 +115,8 @@ macro sqlSelectMacro*(table: string, data: varargs[string], left: varargs[string
       acc.add(a & ",")
     acc = acc[0 .. ^2]
     acc.add(")")
+
+  when defined(testSqlquery):
+    echo "SELECT " & res & " FROM " & $table & lef & wes & acc & " " & $user
 
   result = parseStmt("sql(\"SELECT " & res & " FROM " & $table & lef & wes & acc & " " & $user & "\")")

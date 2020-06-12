@@ -16,6 +16,9 @@ proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query)
     fields.add(d)
     vals.add('?')
 
+  when defined(testSqlquery):
+    echo fields & ") VALUES (" & vals & ")"
+
   result = sql(fields & ") VALUES (" & vals & ")")
 
 
@@ -32,6 +35,9 @@ proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
     fields.add(d)
     vals.add('?')
 
+  when defined(testSqlquery):
+    echo fields & ") VALUES (" & vals & ")"
+
   result = sql(fields & ") VALUES (" & vals & ")")
 
 
@@ -47,5 +53,8 @@ macro sqlInsertMacro*(table: string, data: varargs[string]): SqlQuery =
       vals.add(", ")
     fields.add($d)
     vals.add('?')
+
+  when defined(testSqlquery):
+    echo fields & ") VALUES (" & vals & ")"
 
   result = parseStmt("sql(\"" & $fields & ") VALUES (" & $vals & ")\")")

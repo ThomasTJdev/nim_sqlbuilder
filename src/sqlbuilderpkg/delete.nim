@@ -11,6 +11,9 @@ proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
       wes.add(" AND ")
     wes.add(d & " = ?")
 
+  when defined(testSqlquery):
+    echo res & wes
+
   result = sql(res & wes)
 
 
@@ -28,6 +31,9 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
     else:
       wes.add(d & " = ?")
 
+  when defined(testSqlquery):
+    echo res & wes
+
   result = sql(res & wes)
 
 
@@ -41,5 +47,8 @@ macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
     if i > 0:
       wes.add(" AND ")
     wes.add($d & " = ?")
+
+  when defined(testSqlquery):
+    echo res & wes
 
   result = parseStmt("sql(\"" & res & wes & "\")")
