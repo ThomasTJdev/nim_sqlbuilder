@@ -7,19 +7,19 @@ SQL builder for ``INSERT``, ``UPDATE``, ``SELECT`` and ``DELETE`` queries.
 The builder will check for NULL values and build a query with them.
 
 After Nim's update to 0.19.0, the check for NULL values has been removed
-due to the removal of ``nil``. This library's main goal is to allow the
-user, to insert NULL values into the database again.
+due to the removal of ``nil``.
 
-This packages uses Nim's standard packages, e.g. db_postgres,
-proc to escape qoutes.
+This library's main goal is to allow the user, to insert NULL values into the
+database again, and ease the creating of queries.
 
 
 # Macro generated queries
  
 The library supports generating the queries with a macro, which improves the
 performance due to query being generated on compile time. The macro generated
-queries **do not** accept the `genArgs()` - so there's currently not NULL-
-support.
+queries **do not** accept the `genArgs()` and `genArgsColumns()` due to not
+being available on compile time - so there's currently not NULL-support for
+macros.
 
 
 # NULL values
@@ -27,16 +27,16 @@ support.
 
 ## A NULL value
 
-The global ``var dbNullVal`` represents a NULL value. Use ``dbNullVal``
+The global ``const dbNullVal`` represents a NULL value. Use ``dbNullVal``
 in your args, if you need to insert/update to a NULL value.
 
 ## Insert value or NULL
 
-The global ``proc dbValOrNull()`` will check, if it's contain a value
+The global ``proc dbValOrNull()`` will check, if it contains a value
 or is empty. If it contains a value, the value will be used in the args,
 otherwise a NULL value (``dbNullVal``) will be used.
 
-``dbValOrNull()`` accepts both strings and int.
+``dbValOrNull()`` accepts all types due to `value: auto`.
 
 
 ## Executing DB commands
@@ -62,13 +62,13 @@ All the examples uses a table named: ``myTable`` and they use the WHERE argument
 ```
 
 
-
 ### Version 2
 ```nim
  exec(db, sqlUpdate("myTable", ["email", "age"], ["name"]), "em@em.com", 20, "John")
  # ==> string, int
  # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
 ```
+
 
 
 ## Update NULL & int
@@ -91,11 +91,14 @@ All the examples uses a table named: ``myTable`` and they use the WHERE argument
 ```
 
 
-## Error: Update string & NULL
+## Error: Update string & NULL into an integer column
 
 An empty string, "", will be inserted into the database as NULL.
 Empty string cannot be used for an INTEGER column. You therefore
 need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
+
+This is due to, that the library does not know you DB-architecture, so it
+is your responsibility to respect the columns.
 
 ```nim
  a = genArgs("aa@aa.aa", "", "John")
@@ -122,9 +125,59 @@ need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
 ## Update unknow value - maybe NULL
 
 ```nim
- a = genArgs(dbValOrNull(stringVar), dbValOrNull(intVar), "John")
+ a = genArgs(dbValOrNull(var1), dbValOrNull(var2), "John")
  exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> NULL, NULL -or- STRING, INT
+ # ==> AUTO or NULL, AUTO or NULL, string
+```
+
+
+
+# Dynamic selection of columns
+Select which columns to include.
+
+Lets say, that you are importing data from a spreadsheet with static
+columns, and you need to update your DB with the new values.
+
+If the spreadsheet contains an empty field, you can update your DB with the
+NULL value. But sometimes the spreadsheet only contains 5 out of the 10
+static columns. Now you don't know the values of the last 5 columns,
+which will result in updating the DB with NULL values.
+
+The template `genArgsColumns()` allows you to use the same query, but  selecting
+only the columns which shall be updated. When importing your spreadsheet, check
+if the column exists (bool), and pass that as the `use: bool` param. If
+the column does not exists, it will be skipped in the query.
+
+## Insert & Delete
+```nim
+ let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", "never"))
+ # We are using the column `name` and `age` and ignoring the column `nim`.
+
+ echo $a.args
+ # ==> Args: @["Thomas", "30"]
+
+ let a1 = sqlInsert("my-table", s, a.query) 
+ # ==> INSERT INTO my-table (name, age) VALUES (?, ?)
+ 
+ let a2 = sqlDelete("my-table", s, a.query)
+ # ==> DELETE FROM my-table WHERE name = ? AND age = ?
+```
+
+## Update & Select
+```nim
+ let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
+ # We are using the column `name` and `age` and ignoring the column `nim`. We
+ # are using the value `154` as our identifier, therefor the column is not 
+ # specified
+
+ echo $a.args
+ # ==> Args: @["Thomas", "30", "154"]
+ 
+ let a3 = sqlUpdate("my-table", s, ["id"], a.query)
+ # ==> UPDATE my-table SET name = ?, age = ? WHERE id = ?
+ 
+ let a4 = sqlSelect("my-table", s, [""], ["id ="], "", "", "", a.query)
+ # ==> SELECT name, age FROM my-table WHERE id = ? 
 ```
 
 
@@ -153,6 +206,9 @@ need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
 
 
 # Examples (SELECT)
+
+Please note that you have to define the equal symbol for the where clause. This
+allows you to use `=`, `!=`, `>`, `<`, etc.
 
 ## Select without NULL
 
@@ -213,11 +269,15 @@ need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
  # ORDER BY myTable.email
 ```
 
+# Debug
+If you need to debug and see the queries, just pass `-d:testSqlquery` to print
+the queries.
 
- # Credit
+# Credit
 Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
+
 # Imports
-import strutils, db_postgres
+import strutils, db_common
 
 # Types
 ## Procs
@@ -292,6 +352,28 @@ Checks for NULL values
 template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
 ```
 Create argument container for query and passed args
+
+### template genArgsColumns*[T]
+```nim
+template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq[string], args: ArgsContainer] =
+```
+Create argument container for query and passed args and selecting which
+columns to update. It's and expansion of `genArgs()`, since you can
+decide which columns, there should be included.
+
+Lets say, that you are importing data from a spreadsheet with static
+columns, and you need to update your DB with the new values.
+
+If the spreadsheet contains an empty field, you can update your DB with the
+NULL value. But sometimes the spreadsheet only contains 5 out of the 10
+static columns. Now you don't know the values of the last 5 columns,
+which will result in updating the DB with NULL values.
+
+This template allows you to use the same query, but dynamic selecting only the
+columns which shall be updated. When importing your spreadsheet, check
+if the column exists (bool), and pass that as the `use: bool` param. If
+the column does not exists, it will be skipped in the query.
+
 ## Other
 ### ArgObj*
 ```nim
