@@ -16,7 +16,7 @@
 ##
 ## Macro generated queries
 ## --------
-## 
+##
 ## The library supports generating the queries with a macro, which improves the
 ## performance due to query being generated on compile time. The macro generated
 ## queries **do not** accept the `genArgs()` - so there's currently not NULL-
@@ -213,23 +213,34 @@
 ## # Credit
 ## Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
 
-import strutils, db_postgres, macros
-from times import epochTime
+import strutils, db_common, macros
 
 type
   ArgObj* = object ## Argument object
     val: string
     isNull: bool
 
-  ArgsContainer = object ## Argument container used for queries and args
+  ArgsContainer* = object ## Argument container used for queries and args
     query*: seq[ArgObj]
     args*: seq[string]
+
+  ArgsFormat = object
+    use: bool
+    column: string
+    value: string
 
 
 const dbNullVal* = ArgObj(isNull: true) ## Global NULL value
 
 
-proc argType*(v: ArgObj): ArgObj =
+proc argFormat*(v: tuple): ArgsFormat =
+  ## Formats the tuple, so int, float, bool, etc. can be used directly.
+  result.use = v[0]
+  result.column = v[1]
+  result.value = $v[2]
+
+
+proc argType(v: ArgObj): ArgObj =
   ## Checks if a ``ArgObj`` is NULL and return
   ## ``dbNullVal``. If it's not NULL, the passed
   ## ``ArgObj`` is returned.
@@ -239,7 +250,7 @@ proc argType*(v: ArgObj): ArgObj =
     return v
 
 
-proc argType*(v: string | int): ArgObj =
+proc argType*(v: auto): ArgObj =
   ## Transforms a string or int to a ``ArgObj``
   var arg: ArgObj
   arg.isNull = false
@@ -247,7 +258,7 @@ proc argType*(v: string | int): ArgObj =
   return arg
 
 
-proc dbValOrNull*(v: string | int): ArgObj =
+proc dbValOrNull*(v: auto): ArgObj =
   ## Return NULL obj if len() == 0, else return value obj
   if len($v) == 0:
     return dbNullVal
@@ -258,7 +269,8 @@ proc dbValOrNull*(v: string | int): ArgObj =
 
 
 template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
-  ## Create argument container for query and passed args
+  ## Create argument container for query and passed args. This allows for
+  ## using NULL in queries.
   var argsContainer: ArgsContainer
   argsContainer.query = @[]
   argsContainer.args = @[]
@@ -272,6 +284,43 @@ template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
   argsContainer
 
 
+template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq[string], args: ArgsContainer] =
+  ## Create argument container for query and passed args and selecting which
+  ## columns to update. It's and expansion of `genArgs()`, since you can
+  ## decide which columns, there should be included.
+  ##
+  ##
+  ## Lets say, that you are importing data from a spreadsheet with static
+  ## columns, and you need to update your DB with the new values.
+  ##
+  ## If the spreadsheet contains an empty field, you can update your DB with the
+  ## NULL value. But sometimes the spreadsheet only contains 5 out of the 10
+  ## static columns. Now you don't know the values of the last 5 columns,
+  ## which will result in updating the DB with NULL values.
+  ##
+  ## This template allows you to use the same query, but dynamic selecting only the
+  ## columns which shall be updated. When importing your spreadsheet, check
+  ## if the column exists (bool), and pass that as the `use: bool` param. If
+  ## the column does not exists, it will be skipped in the query.
+  var
+    select: seq[string]
+    argsContainer: ArgsContainer
+  argsContainer.query = @[]
+  argsContainer.args = @[]
+  for arg in arguments:
+    let argObject = argType(arg.value)
+    if not arg.use:
+      continue
+    if arg.column != "":
+      select.add(arg.column)
+    if argObject.isNull:
+      argsContainer.query.add(argObject)
+    else:
+      argsContainer.query.add(argObject)
+      argsContainer.args.add(argObject.val)
+  (select, argsContainer)
+
+
 include sqlbuilderpkg/insert
 include sqlbuilderpkg/update
 include sqlbuilderpkg/delete
@@ -279,7 +328,7 @@ include sqlbuilderpkg/select
 
 
 when isMainModule:
-
+  from times import epochTime
   let a = epochTime()
   for i in countup(0,100000):
     let a = sqlSelectMacro("myTable", ["id", "name", "j"], [""], ["email =", "name ="], "", "", "")
