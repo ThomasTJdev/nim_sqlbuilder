@@ -38,6 +38,12 @@ otherwise a NULL value (``dbNullVal``) will be used.
 
 ``dbValOrNull()`` accepts all types due to `value: auto`.
 
+## Auto NULL-values
+
+There are two generators, which can generate the `NULL` values for you.
+
+* `genArgs` does only set a field to `NULL` if `dbNullVal`/`dbValOrNull()` is passed.
+* `genArgsSetNull` sets empty field (`""` / `c.len() == 0`) to `NULL`.
 
 ## Executing DB commands
 
@@ -48,12 +54,6 @@ The examples below support the various DB commands such as ``exec``,
 # Examples (NULL values)
 
 All the examples uses a table named: ``myTable`` and they use the WHERE argument on: ``name``.
-
-
-## genArgs / genArgsSetNull
-
-* `genArgs` does only set a field to `NULL` if `dbNullVal` is passed.
-* `genArgsSetNull` sets empty field to `NULL`.
 
 
 ## Update string & int
@@ -75,6 +75,14 @@ All the examples uses a table named: ``myTable`` and they use the WHERE argument
  # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
 ```
 
+
+### Version 3
+```nim
+ let a = genArgsSetNull("em@em.com", "", "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> string, NULL
+ # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
+```
 
 
 ## Update NULL & int
