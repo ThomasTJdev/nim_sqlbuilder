@@ -227,20 +227,17 @@ type
   ArgsFormat = object
     use: bool
     column: string
-    value: string
+    value: ArgObj
+
+
+when defined(test):
+  var testout*: string
 
 
 const dbNullVal* = ArgObj(isNull: true) ## Global NULL value
 
 
-proc argFormat*(v: tuple): ArgsFormat =
-  ## Formats the tuple, so int, float, bool, etc. can be used directly.
-  result.use = v[0]
-  result.column = v[1]
-  result.value = $v[2]
-
-
-proc argType(v: ArgObj): ArgObj =
+proc argType*(v: ArgObj): ArgObj =
   ## Checks if a ``ArgObj`` is NULL and return
   ## ``dbNullVal``. If it's not NULL, the passed
   ## ``ArgObj`` is returned.
@@ -250,7 +247,7 @@ proc argType(v: ArgObj): ArgObj =
     return v
 
 
-proc argType*(v: auto): ArgObj =
+proc argType*(v: string | int): ArgObj =
   ## Transforms a string or int to a ``ArgObj``
   var arg: ArgObj
   arg.isNull = false
@@ -258,7 +255,26 @@ proc argType*(v: auto): ArgObj =
   return arg
 
 
-proc dbValOrNull*(v: auto): ArgObj =
+proc argTypeSetNull*(v: ArgObj): ArgObj =
+  if v.isNull:
+    return dbNullVal
+  elif v.val.len() == 0:
+    return dbNullVal
+  else:
+    return v
+
+
+proc argTypeSetNull*(v: string | int): ArgObj =
+  var arg: ArgObj
+  if len($v) == 0:
+    return dbNullVal
+  else:
+    arg.isNull = false
+    arg.val = $v
+    return arg
+
+
+proc dbValOrNull*(v: string | int): ArgObj =
   ## Return NULL obj if len() == 0, else return value obj
   if len($v) == 0:
     return dbNullVal
@@ -266,6 +282,13 @@ proc dbValOrNull*(v: auto): ArgObj =
   arg.val = $v
   arg.isNull = false
   return arg
+
+
+proc argFormat*(v: tuple): ArgsFormat =
+  ## Formats the tuple, so int, float, bool, etc. can be used directly.
+  result.use = v[0]
+  result.column = v[1]
+  result.value = argType(v[2])
 
 
 template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
@@ -276,6 +299,21 @@ template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
   argsContainer.args = @[]
   for arg in arguments:
     let argObject = argType(arg)
+    if argObject.isNull:
+      argsContainer.query.add(argObject)
+    else:
+      argsContainer.query.add(argObject)
+      argsContainer.args.add(argObject.val)
+  argsContainer
+
+
+template genArgsSetNull*[T](arguments: varargs[T, argType]): ArgsContainer =
+  ## Create argument container for query and passed args
+  var argsContainer: ArgsContainer
+  argsContainer.query = @[]
+  argsContainer.args = @[]
+  for arg in arguments:
+    let argObject = argTypeSetNull(arg)
     if argObject.isNull:
       argsContainer.query.add(argObject)
     else:

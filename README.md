@@ -47,8 +47,14 @@ The examples below support the various DB commands such as ``exec``,
 
 # Examples (NULL values)
 
-
 All the examples uses a table named: ``myTable`` and they use the WHERE argument on: ``name``.
+
+
+## genArgs / genArgsSetNull
+
+* `genArgs` does only set a field to `NULL` if `dbNullVal` is passed.
+* `genArgsSetNull` sets empty field to `NULL`.
+
 
 ## Update string & int
 
