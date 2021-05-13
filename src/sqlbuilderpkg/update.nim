@@ -22,6 +22,9 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], ar
   when defined(testSqlquery):
     echo fields & wes
 
+  when defined(test):
+    testout = fields & wes
+
   result = sql(fields & wes)
 
 
@@ -42,6 +45,9 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): S
 
   when defined(testSqlquery):
     echo fields & wes
+
+  when defined(test):
+    testout = fields & wes
 
   result = sql(fields & wes)
 

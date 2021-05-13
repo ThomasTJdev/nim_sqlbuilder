@@ -36,6 +36,9 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
   when defined(testSqlquery):
     echo res & " FROM " & table & lef & wes & acc & " " & user
 
+  when defined(test):
+    testout = res & " FROM " & table & lef & wes & acc & " " & user
+
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 
 
@@ -77,6 +80,9 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
 
   when defined(testSqlquery):
     echo res & " FROM " & table & lef & wes & acc & " " & user
+
+  when defined(test):
+    testout = res & " FROM " & table & lef & wes & acc & " " & user
 
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 

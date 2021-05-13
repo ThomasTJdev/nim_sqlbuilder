@@ -19,6 +19,9 @@ proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query)
   when defined(testSqlquery):
     echo fields & ") VALUES (" & vals & ")"
 
+  when defined(test):
+    testout = fields & ") VALUES (" & vals & ")"
+
   result = sql(fields & ") VALUES (" & vals & ")")
 
 
@@ -37,6 +40,9 @@ proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
 
   when defined(testSqlquery):
     echo fields & ") VALUES (" & vals & ")"
+
+  when defined(test):
+    testout = fields & ") VALUES (" & vals & ")"
 
   result = sql(fields & ") VALUES (" & vals & ")")
 
