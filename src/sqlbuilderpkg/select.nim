@@ -28,9 +28,13 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
       acc.add("(")
     else:
       acc.add(" AND " & accessC & " in (")
+    var inVal: string
     for a in split(access, ","):
-      acc.add(a & ",")
-    acc = acc[0 .. ^2]
+      if a == "": continue
+      if inVal != "":
+        inVal.add(",")
+      inVal.add(a)
+    acc.add(if inVal == "": "0" else: inVal)
     acc.add(")")
 
   when defined(testSqlquery):
@@ -73,9 +77,13 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
       acc.add("(")
     else:
       acc.add(" AND " & accessC & " in (")
+    var inVal: string
     for a in split(access, ","):
-      acc.add(a & ",")
-    acc = acc[0 .. ^2]
+      if a == "": continue
+      if inVal != "":
+        inVal.add(",")
+      inVal.add(a)
+    acc.add(if inVal == "": "0" else: inVal)
     acc.add(")")
 
   when defined(testSqlquery):
@@ -120,6 +128,8 @@ macro sqlSelectMacro*(table: string, data: varargs[string], left: varargs[string
     for a in split($access, ","):
       acc.add(a & ",")
     acc = acc[0 .. ^2]
+    if acc.len() == 0:
+      acc.add("0")
     acc.add(")")
 
   when defined(testSqlquery):

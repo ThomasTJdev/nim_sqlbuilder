@@ -213,7 +213,10 @@
 ## # Credit
 ## Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
 
-import strutils, db_common, macros
+import
+  std/db_common,
+  std/macros,
+  std/strutils
 
 type
   ArgObj* = object ## Argument object
