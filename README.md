@@ -6,20 +6,61 @@
 SQL builder for ``INSERT``, ``UPDATE``, ``SELECT`` and ``DELETE`` queries.
 The builder will check for NULL values and build a query with them.
 
-After Nim's update to 0.19.0, the check for NULL values has been removed
+After Nim's update to 0.19.0, the check for NULL values was removed
 due to the removal of ``nil``.
 
-This library's main goal is to allow the user, to insert NULL values into the
-database again, and ease the creating of queries.
+This library allows the user, to insert NULL values into queries and
+ease the creating of queries.
+
+
+
+# Importing
+
+## Import all
+```nim
+import sqlbuilder
+```
+
+## Import only the SELECT builder
+```nim
+import sqlbuilder/select
+```
+
+## Import all but with legacy softdelete fix
+```nim
+# nano sqlfile.nim
+# import this file instead of sqlbuilder
+
+import src/sqlbuilderpkg/insert
+export insert
+
+import src/sqlbuilderpkg/update
+export update
+
+import src/sqlbuilderpkg/delete
+export delete
+
+import src/sqlbuilderpkg/utils
+export utils
+
+# This enables the softdelete columns for the legacy selector
+const tablesWithDeleteMarker = ["tasks", "persons"]
+# Notice the include instead of import
+include src/sqlbuilderpkg/select
+```
+
 
 
 # Macro generated queries
- 
-The library supports generating the queries with a macro, which improves the
-performance due to query being generated on compile time. The macro generated
+
+The library supports generating some queries with a macro, which improves the
+performance due to query being generated on compile time.
+
+The macro generated
 queries **do not** accept the `genArgs()` and `genArgsColumns()` due to not
 being available on compile time - so there's currently not NULL-support for
 macros.
+
 
 
 # NULL values
@@ -196,6 +237,7 @@ the column does not exists, it will be skipped in the query.
 
 
 
+
 # Examples (INSERT)
 
 ## Insert without NULL
@@ -224,183 +266,147 @@ the column does not exists, it will be skipped in the query.
 Please note that you have to define the equal symbol for the where clause. This
 allows you to use `=`, `!=`, `>`, `<`, etc.
 
-## Select without NULL
+## Select query builder
+
+The SELECT builder gives access to the following fields:
+
+* BASE
+  * table: string,
+  * select: varargs[string],
+  * where: varargs[string],
+* JOIN
+  * joinargs: varargs[tuple[table: string, tableAs: string, on: seq[string]]] = [],
+  * jointype: SQLJoinType = LEFT,
+* WHERE IN
+  * whereInField: string = "",
+  * whereInValue: seq[string] = @[],
+  * whereInValueString: seq[string] = @[],
+  * whereInValueInt: seq[int] = @[],
+* Custom SQL, e.g. ORDER BY
+  * customSQL: string = "",
+* Null checks
+  * checkedArgs: ArgsContainer.query = @[],
+* Table alias
+  * tableAs: string = table,
+* Soft delete
+  * hideIsDeleted: bool = true,
+  * tablesWithDeleteMarker: varargs[string] = @[],
+  * deleteMarker = ".is_deleted IS NULL",
+
+## Example on builder
+```nim
+test = sqlSelect(
+  table     = "tasks",
+  tableAs   = "t",
+  select    = @["id", "name"],
+  where     = @["id ="],
+  joinargs  = @[(table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])],
+  jointype  = INNER
+)
+check querycompare(test, sql("SELECT id, name FROM tasks AS t INNER JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
+```
 
 ```nim
- getValue(db, sqlSelect("myTable",
-   ["email", "age"], [""], ["name ="], "", "", ""), "John")
- # SELECT email, age FROM myTable WHERE name = ?
-
- getValue(db, sqlSelect("myTable",
-   ["myTable.email", "myTable.age", "company.name"],
-   ["company ON company.email = myTable.email"],
-   ["myTable.name =", "myTable.age ="], "", "", ""),
-   "John", "20")
- # SELECT myTable.email, myTable.age, company.name
- # FROM myTable
- # LEFT JOIN company ON company.email = myTable.email
- # WHERE myTable.name = ? AND myTable.age = ?
-
- getAllRows(db, sqlSelect("myTable",
-   ["myTable.email", "myTable.age", "company.name"],
-   ["company ON company.email = myTable.email"],
-   ["company.name ="], "20,22,24", "myTable.age", "ORDER BY myTable.email"),
-   "BigBiz")
- # SELECT myTable.email, myTable.age, company.name
- # FROM myTable LEFT JOIN company ON company.email = myTable.email
- # WHERE company.name = ? AND myTable.age IN (20,22,24)
- # ORDER BY myTable.email
+test = sqlSelect(
+  table     = "tasksitems",
+  tableAs   = "tasks",
+  select    = @[
+      "tasks.id",
+      "tasks.name",
+      "tasks.status",
+      "tasks.created",
+      "his.id",
+      "his.name",
+      "his.status",
+      "his.created",
+      "projects.id",
+      "projects.name",
+      "person.id",
+      "person.name",
+      "person.email"
+    ],
+  where     = @[
+      "projects.id =",
+      "tasks.status >"
+    ],
+  joinargs  = @[
+      (table: "history", tableAs: "his", on: @["his.id = tasks.hid", "his.status = 1"]),
+      (table: "projects", tableAs: "", on: @["projects.id = tasks.project_id", "projects.status = 1"]),
+      (table: "person", tableAs: "", on: @["person.id = tasks.person_id"])
+    ],
+  whereInField = "tasks.id",
+  whereInValue = @["1", "2", "3"],
+  customSQL = "ORDER BY tasks.created DESC",
+  tablesWithDeleteMarker = tableWithDeleteMarker
+)
+check querycompare(test, (sql("""
+    SELECT
+      tasks.id,
+      tasks.name,
+      tasks.status,
+      tasks.created,
+      his.id,
+      his.name,
+      his.status,
+      his.created,
+      projects.id,
+      projects.name,
+      person.id,
+      person.name,
+      person.email
+    FROM
+      tasksitems AS tasks
+    LEFT JOIN history AS his ON
+      (his.id = tasks.hid AND his.status = 1 AND his.is_deleted IS NULL)
+    LEFT JOIN projects ON
+      (projects.id = tasks.project_id AND projects.status = 1)
+    LEFT JOIN person ON
+      (person.id = tasks.person_id)
+    WHERE
+          projects.id = ?
+      AND tasks.status > ?
+      AND tasks.id in (1,2,3)
+      AND tasks.is_deleted IS NULL
+    ORDER BY
+      tasks.created DESC
+  """)))
 ```
 
 
-## Select with NULL
+## Convert legacy
+
+The legacy SELECT builder is deprecated and will be removed in the future. It
+is commented out in the source code, and a converter has been added to convert
+the legacy query to the new builder.
+
+That means, you don't have to worry, but you should definitely convert your
+legacy queries to the new builder.
 
 ```nim
- let a = genArgs(dbNullVal)
- getValue(db, sqlSelect("myTable",
-   ["email", "age"], [""], ["name ="], "", "", "", a.query), a.args)
- # SELECT email, age FROM myTable WHERE name = NULL
+# Legacy builder
+test = sqlSelect("tasks AS t", ["t.id", "t.name", "p.id"], ["project AS p ON p.id = t.project_id"], ["t.id ="], "", "", "")
 
- let a = genArgs("John", dbNullVal)
- getValue(db, sqlSelect("myTable",
-   ["myTable.email", "myTable.age", "company.name"],
-   ["company ON company.email = myTable.email"],
-   ["myTable.name =", "myTable.age ="], "", "", "", a.query), a.args)
- # SELECT myTable.email, myTable.age, company.name
- # FROM myTable
- # LEFT JOIN company ON company.email = myTable.email
- # WHERE myTable.name = ? AND myTable.age = NULL
-
- let a = genArgs(dbNullVal)
- getAllRows(db, sqlSelect("myTable",
-   ["myTable.email", "myTable.age", "company.name"],
-   ["company ON company.email = myTable.email"],
-   ["company.name ="], "20,22,24", "myTable.age", "ORDER BY myTable.email", a.query),
-   a.args)
- # SELECT myTable.email, myTable.age, company.name
- # FROM myTable LEFT JOIN company ON company.email = myTable.email
- # WHERE company.name = NULL AND myTable.age IN (20,22,24)
- # ORDER BY myTable.email
+check querycompare(test, sql("""
+    SELECT
+      t.id,
+      t.name,
+      p.id
+    FROM
+      tasks AS t
+    LEFT JOIN project AS p ON
+      (p.id = t.project_id)
+    WHERE
+      t.id = ?
+  """))
 ```
 
-# Debug
-If you need to debug and see the queries, just pass `-d:testSqlquery` to print
-the queries.
+
+
+# Examples
+
+See the test files.
+
+
 
 # Credit
 Inspiration for builder: [Nim Forum](https://github.com/nim-lang/nimforum)
-
-# Imports
-import strutils, db_common
-
-# Types
-## Procs
-### proc argType*
-```nim
-proc argType*(v: ArgObj): ArgObj =
-```
-Checks if a ``ArgObj`` is NULL and return
-``dbNullVal``. If it's not NULL, the passed
-``ArgObj`` is returned.
-### proc argType*
-```nim
-proc argType*(v: string | int): ArgObj =
-```
-Transforms a string or int to a ``ArgObj``
-### proc dbValOrNull*
-```nim
-proc dbValOrNull*(v: string | int): ArgObj =
-```
-Return NULL obj if len() == 0, else return value obj
-### proc sqlInsert*
-```nim
-proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query): SqlQuery =
-```
-SQL builder for INSERT queries
-Checks for NULL values
-### proc sqlInsert*
-```nim
-proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
-```
-SQL builder for INSERT queries
-Does NOT check for NULL values
-### proc sqlUpdate*
-```nim
-proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], args: ArgsContainer.query): SqlQuery =
-```
-SQL builder for UPDATE queries
-Checks for NULL values
-### proc sqlUpdate*
-```nim
-proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): SqlQuery =
-```
-SQL builder for UPDATE queries
-Does NOT check for NULL values
-### proc sqlDelete*
-```nim
-proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
-```
-SQL builder for DELETE queries
-Does NOT check for NULL values
-### proc sqlDelete*
-```nim
-proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query): SqlQuery =
-```
-SQL builder for DELETE queries
-Checks for NULL values
-### proc sqlSelect*
-```nim
-proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string): SqlQuery =
-```
-SQL builder for SELECT queries
-Does NOT check for NULL values
-### proc sqlSelect*
-```nim
-proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string, args: ArgsContainer.query): SqlQuery =
-```
-SQL builder for SELECT queries
-Checks for NULL values
-## Templates
-### template genArgs*[T]
-```nim
-template genArgs*[T](arguments: varargs[T, argType]): ArgsContainer =
-```
-Create argument container for query and passed args
-
-### template genArgsColumns*[T]
-```nim
-template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq[string], args: ArgsContainer] =
-```
-Create argument container for query and passed args and selecting which
-columns to update. It's and expansion of `genArgs()`, since you can
-decide which columns, there should be included.
-
-Lets say, that you are importing data from a spreadsheet with static
-columns, and you need to update your DB with the new values.
-
-If the spreadsheet contains an empty field, you can update your DB with the
-NULL value. But sometimes the spreadsheet only contains 5 out of the 10
-static columns. Now you don't know the values of the last 5 columns,
-which will result in updating the DB with NULL values.
-
-This template allows you to use the same query, but dynamic selecting only the
-columns which shall be updated. When importing your spreadsheet, check
-if the column exists (bool), and pass that as the `use: bool` param. If
-the column does not exists, it will be skipped in the query.
-
-## Other
-### ArgObj*
-```nim
-ArgObj* = object
-```
-Argument object
-### ArgsContainer
-```nim
-ArgsContainer = object
-```
-Argument container used for queries and args
-### var dbNullVal*
-```nim
-var dbNullVal*: ArgObj
-```
-Global NULL value

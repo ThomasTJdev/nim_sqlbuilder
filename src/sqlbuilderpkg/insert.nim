@@ -1,6 +1,15 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 
+import
+  std/db_common,
+  std/macros,
+  std/strutils
+
+import
+  ./utils
+
+
 proc sqlInsert*(table: string, data: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for INSERT queries
   ## Checks for NULL values

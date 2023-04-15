@@ -1,5 +1,15 @@
 # Copyright 2020 - Thomas T. Jarløv
 
+
+import
+  std/db_common,
+  std/macros,
+  std/strutils
+
+import
+  ./utils
+
+
 proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
   ## SQL builder for DELETE queries
   ## Does NOT check for NULL values

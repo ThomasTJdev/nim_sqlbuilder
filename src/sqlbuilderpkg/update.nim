@@ -1,6 +1,15 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 
+import
+  std/db_common,
+  std/macros,
+  std/strutils
+
+import
+  ./utils
+
+
 proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for UPDATE queries
   ## Checks for NULL values
@@ -13,6 +22,7 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], ar
       fields.add(d & " = NULL")
     else:
       fields.add(d & " = ?")
+
   var wes = " WHERE "
   for i, d in where:
     if i > 0:
@@ -37,6 +47,7 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string]): S
     if i > 0:
       fields.add(", ")
     fields.add(d & " = ?")
+
   var wes = " WHERE "
   for i, d in where:
     if i > 0:
