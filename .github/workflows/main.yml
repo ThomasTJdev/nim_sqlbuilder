@@ -13,9 +13,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
-          - macOS-latest
         version:
+          - 1.6.14
           - stable
 
     steps:
@@ -30,11 +29,5 @@ jobs:
     - name: Print Nimble version
       run: nimble -v
 
-    #- name: Nimble Refresh
-    #  run: nimble -y refresh
-
-    #- name: Nimble Install dependencies
-    #  run: nimble -y install --depsOnly
-
     - name: Build binaries
-      run: nimble install -d:release
+      run: nimble test
