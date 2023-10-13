@@ -2,24 +2,24 @@
 
 
 
-import src/sqlbuilderpkg/insert
-export insert
+# import src/sqlbuilderpkg/insert
+# export insert
 
-import src/sqlbuilderpkg/update
-export update
+# import src/sqlbuilderpkg/update
+# export update
 
-import src/sqlbuilderpkg/delete
-export delete
+# import src/sqlbuilderpkg/delete
+# export delete
 
-import src/sqlbuilderpkg/utils
-export utils
-
-const tablesWithDeleteMarker = ["tasks", "persons"]
-
-include src/sqlbuilderpkg/select
-
+# import src/sqlbuilderpkg/utils
+# export utils
 
 import std/unittest
+const tablesWithDeleteMarkerInit = ["tasks", "persons"]
+
+include src/sqlbuilder_include
+
+
 
 
 proc querycompare(a, b: SqlQuery): bool =
@@ -54,6 +54,21 @@ suite "test sqlSelect":
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? "))
 
 
+
+suite "test sqlSelect with inline NULL":
+
+  test "set tablesWithDeleteMarker":
+
+    let test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id =", "name = NULL"],
+      hideIsDeleted = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? AND name = NULL "))
+
+
+
 suite "test sqlSelectConst":
 
   test "set tablesWithDeleteMarker":
@@ -62,57 +77,8 @@ suite "test sqlSelectConst":
       table     = "tasks",
       tableAs   = "t",
       select    = ["t.id", "t.name", "t.description", "t.created", "t.updated", "t.completed"],
+      # joinargs  = [(table: "projects", tableAs: "", on: @["projects.id = tasks.project_id", "projects.status = 1"]), (table: "projects", tableAs: "", on: @["projects.id = tasks.project_id", "projects.status = 1"])],
       where     = ["t.id ="],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"], #tableWithDeleteMarker
     )
 
-
-
-suite "test sqlSelect(converter) legacy":
-
-  test "set tablesWithDeleteMarker":
-
-
-    let test = sqlSelect("tasks AS t", ["t.id", "t.name", "p.id"], ["project AS p ON p.id = t.project_id"], ["t.id ="], "2,4,6,7", "p.id", "ORDER BY t.name")
-
-    check querycompare(test, sql("""
-        SELECT
-          t.id,
-          t.name,
-          p.id
-        FROM
-          tasks AS t
-        LEFT JOIN project AS p ON
-          (p.id = t.project_id)
-        WHERE
-              t.id = ?
-          AND p.id in (2,4,6,7)
-          AND t.is_deleted IS NULL
-        ORDER BY
-          t.name
-      """))
-
-
-  test "double delete":
-
-
-    let test = sqlSelect("tasks AS t", ["t.id", "t.name", "p.id"], ["project AS p ON p.id = t.project_id", "persons ON persons.id = tasks.person_id AND persons.is_deleted IS NULL"], ["t.id ="], "2,4,6,7", "p.id", "ORDER BY t.name")
-
-    check querycompare(test, sql("""
-        SELECT
-          t.id,
-          t.name,
-          p.id
-        FROM
-          tasks AS t
-        LEFT JOIN project AS p ON
-          (p.id = t.project_id)
-        LEFT JOIN persons ON
-          (persons.id = tasks.person_id AND persons.is_deleted IS NULL AND persons.is_deleted IS NULL)
-        WHERE
-              t.id = ?
-          AND p.id in (2,4,6,7)
-          AND t.is_deleted IS NULL
-        ORDER BY
-          t.name
-      """))
