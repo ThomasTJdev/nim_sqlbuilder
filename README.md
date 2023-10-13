@@ -13,6 +13,22 @@ This library allows the user, to insert NULL values into queries and
 ease the creating of queries.
 
 
+# TOC
+
+- General
+  - [Importing and use](#importing)
+  - [Macro generated queries](#macro-generated-queries)
+  - [NULL values](#null-values)
+- Main examples
+  - [Examples (INSERT)](#examples-insert)
+  - [Examples (UPDATE)](#examples-update)
+  - [Examples (SELECT)](#examples-select)
+- Utilities
+  - [Dynamic selection of columns](#dynamic-selection-of-columns)
+  - [Query calls for the lazy](#query-calls-for-the-lazy)
+  - [Convert result to types](#convert-result-to-types)
+- [Examples](#examples)
+
 
 # Importing
 
@@ -64,6 +80,9 @@ macros.
 
 
 # NULL values
+
+The `genArgs` and `genArgsSetNull` allows you to pass NULL values to the queries.
+These are now only needed for insert-queries.
 
 
 ## A NULL value
@@ -187,60 +206,10 @@ is your responsibility to respect the columns.
 
 
 
-# Dynamic selection of columns
-Select which columns to include.
-
-Lets say, that you are importing data from a spreadsheet with static
-columns, and you need to update your DB with the new values.
-
-If the spreadsheet contains an empty field, you can update your DB with the
-NULL value. But sometimes the spreadsheet only contains 5 out of the 10
-static columns. Now you don't know the values of the last 5 columns,
-which will result in updating the DB with NULL values.
-
-The template `genArgsColumns()` allows you to use the same query, but  selecting
-only the columns which shall be updated. When importing your spreadsheet, check
-if the column exists (bool), and pass that as the `use: bool` param. If
-the column does not exists, it will be skipped in the query.
-
-## Insert & Delete
-```nim
- let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", "never"))
- # We are using the column `name` and `age` and ignoring the column `nim`.
-
- echo $a.args
- # ==> Args: @["Thomas", "30"]
-
- let a1 = sqlInsert("my-table", s, a.query) 
- # ==> INSERT INTO my-table (name, age) VALUES (?, ?)
- 
- let a2 = sqlDelete("my-table", s, a.query)
- # ==> DELETE FROM my-table WHERE name = ? AND age = ?
-```
-
-## Update & Select
-```nim
- let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
- # We are using the column `name` and `age` and ignoring the column `nim`. We
- # are using the value `154` as our identifier, therefor the column is not 
- # specified
-
- echo $a.args
- # ==> Args: @["Thomas", "30", "154"]
- 
- let a3 = sqlUpdate("my-table", s, ["id"], a.query)
- # ==> UPDATE my-table SET name = ?, age = ? WHERE id = ?
- 
- let a4 = sqlSelect("my-table", s, [""], ["id ="], "", "", "", a.query)
- # ==> SELECT name, age FROM my-table WHERE id = ? 
-```
-
-
-
 
 # Examples (INSERT)
 
-## Insert without NULL
+## Insert default
 
 ```nim
  exec(db, sqlInsert("myTable", ["email", "age"]), "em@em.com" , 20)
@@ -248,7 +217,12 @@ the column does not exists, it will be skipped in the query.
  insertID(db, sqlInsert("myTable", ["email", "age"]), "em@em.com", 20)
  # ==> INSERT INTO myTable (email, age) VALUES (?, ?)
 ```
-
+```nim
+ exec(db, sqlInsertMacro("myTable", ["email", "age"]), "em@em.com" , 20)
+ # OR
+ insertID(db, sqlInsertMacro("myTable", ["email", "age"]), "em@em.com", 20)
+ # ==> INSERT INTO myTable (email, age) VALUES (?, ?)
+```
 
 ## Insert with NULL
 
@@ -259,6 +233,27 @@ the column does not exists, it will be skipped in the query.
  insertID(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
  # ==> INSERT INTO myTable (email) VALUES (?)
 ```
+
+
+# Examples (UPDATE)
+
+```nim
+  # sqlUpdate or sqlUpdateMacro
+  let q = sqlUpdate("table", ["name", "age", "info = NULL"], ["id ="])
+  # ==> UPDATE table SET name = ?, age = ?, info = NULL WHERE id = ?
+```
+
+```nim
+  # sqlUpdate or sqlUpdateMacro
+  let q = sqlUpdate(
+      "table",
+      ["name = NULL", "age", "info = NULL"],
+      ["id =", "epoch >", "parent IS NULL", "name IS NOT NULL", "age != 22", "age !="],
+    )
+  # ==> UPDATE table SET name = NULL, age = ?, info = NULL WHERE id = ? AND epoch > ? AND parent IS NULL AND name IS NOT NULL AND age != 22 AND age != ?
+```
+
+
 
 
 # Examples (SELECT)
@@ -402,6 +397,56 @@ check querycompare(test, sql("""
 
 
 
+# Dynamic selection of columns
+Select which columns to include.
+
+Lets say, that you are importing data from a spreadsheet with static
+columns, and you need to update your DB with the new values.
+
+If the spreadsheet contains an empty field, you can update your DB with the
+NULL value. But sometimes the spreadsheet only contains 5 out of the 10
+static columns. Now you don't know the values of the last 5 columns,
+which will result in updating the DB with NULL values.
+
+The template `genArgsColumns()` allows you to use the same query, but  selecting
+only the columns which shall be updated. When importing your spreadsheet, check
+if the column exists (bool), and pass that as the `use: bool` param. If
+the column does not exists, it will be skipped in the query.
+
+## Insert & Delete
+```nim
+ let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", "never"))
+ # We are using the column `name` and `age` and ignoring the column `nim`.
+
+ echo $a.args
+ # ==> Args: @["Thomas", "30"]
+
+ let a1 = sqlInsert("my-table", s, a.query)
+ # ==> INSERT INTO my-table (name, age) VALUES (?, ?)
+
+ let a2 = sqlDelete("my-table", s, a.query)
+ # ==> DELETE FROM my-table WHERE name = ? AND age = ?
+```
+
+## Update & Select
+```nim
+ let (s, a) = genArgsColumns((true, "name", "Thomas"), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
+ # We are using the column `name` and `age` and ignoring the column `nim`. We
+ # are using the value `154` as our identifier, therefor the column is not
+ # specified
+
+ echo $a.args
+ # ==> Args: @["Thomas", "30", "154"]
+
+ let a3 = sqlUpdate("my-table", s, ["id"], a.query)
+ # ==> UPDATE my-table SET name = ?, age = ? WHERE id = ?
+
+ let a4 = sqlSelect("my-table", s, [""], ["id ="], "", "", "", a.query)
+ # ==> SELECT name, age FROM my-table WHERE id = ?
+```
+
+
+
 # Query calls for the lazy
 
 These are procs to catch DB errors and return a default value to move on.
@@ -488,7 +533,7 @@ let
 
 # Examples
 
-See the test files.
+See the test files in `tests/` for more examples.
 
 
 
