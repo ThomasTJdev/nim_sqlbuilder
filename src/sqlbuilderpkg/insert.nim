@@ -1,8 +1,13 @@
 # Copyright 2020 - Thomas T. Jarløv
 
+when NimMajor >= 2:
+  import
+    db_connector/db_common
+else:
+  import
+    std/db_common
 
 import
-  std/db_common,
   std/macros,
   std/strutils
 
@@ -41,10 +46,15 @@ proc sqlInsert*(table: string, data: varargs[string]): SqlQuery =
   var fields = "INSERT INTO " & table & " ("
   var vals = ""
   for i, d in data:
+    # New value
     if i > 0:
       fields.add(", ")
       vals.add(", ")
+
+    # Insert field name
     fields.add(d)
+
+    # Insert value parameter
     vals.add('?')
 
   when defined(testSqlquery):

@@ -19,6 +19,9 @@ export select
 # import sqlbuilderpkg/select_legacy
 # export select_legacy
 
+import sqlbuilderpkg/totypes
+export totypes
+
 import sqlbuilderpkg/utils
 export utils
 

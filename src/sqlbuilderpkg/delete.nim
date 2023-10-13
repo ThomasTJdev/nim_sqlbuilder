@@ -1,8 +1,13 @@
 # Copyright 2020 - Thomas T. Jarløv
 
+when NimMajor >= 2:
+  import
+    db_connector/db_common
+else:
+  import
+    std/db_common
 
 import
-  std/db_common,
   std/macros,
   std/strutils
 

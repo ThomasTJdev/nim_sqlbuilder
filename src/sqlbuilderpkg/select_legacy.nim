@@ -1,8 +1,13 @@
 # Copyright 2020 - Thomas T. Jarløv
 
+when NimMajor >= 2:
+  import
+    db_connector/db_common
+else:
+  import
+    std/db_common
 
 import
-  std/db_common,
   std/macros,
   std/strutils
 
@@ -19,7 +24,7 @@ proc sqlSelect*(
     table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string,
     args: ArgsContainer.query = @[],
     hideIsDeleted: bool = true,
-    tablesWithDeleteMarker: varargs[string] = (when declared(tablesWithDeleteMarker): tablesWithDeleteMarker else: []), #@[],
+    tablesWithDeleteMarker: varargs[string] = (when declared(tablesWithDeleteMarkerInit): tablesWithDeleteMarkerInit else: []), #@[],
     deleteMarker = ".is_deleted IS NULL",
   ): SqlQuery {.deprecated.} =
   ##
