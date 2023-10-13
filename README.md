@@ -31,16 +31,16 @@ import sqlbuilder/select
 # nano sqlfile.nim
 # import this file instead of sqlbuilder
 
-import src/sqlbuilderpkg/insert
+import src/sqlbuilder/sqlbuilderpkg/insert
 export insert
 
-import src/sqlbuilderpkg/update
+import src/sqlbuilder/sqlbuilderpkg/update
 export update
 
-import src/sqlbuilderpkg/delete
+import src/sqlbuilder/sqlbuilderpkg/delete
 export delete
 
-import src/sqlbuilderpkg/utils
+import src/sqlbuilder/sqlbuilderpkg/utils
 export utils
 
 # This enables the softdelete columns for the legacy selector
@@ -400,6 +400,90 @@ check querycompare(test, sql("""
   """))
 ```
 
+
+
+# Query calls for the lazy
+
+These are procs to catch DB errors and return a default value to move on.
+This should only be used if:
+  - It is not critical data
+  - You can live with a default value in case of an error
+  - You have no other way to catch the error
+  - You are to lazy to write the try-except procs yourself
+
+## Import
+
+```nim
+import sqlbuilder/query_calls
+```
+
+## Procs
+
+```nim
+proc getValueTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): string =
+```
+____
+
+
+```nim
+proc getAllRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): seq[Row] =
+```
+
+____
+
+
+```nim
+proc getRowTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): Row =
+```
+
+____
+
+
+```nim
+proc tryExecTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): bool =
+```
+
+____
+
+
+```nim
+proc execTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]) =
+```
+
+____
+
+
+```nim
+proc execAffectedRowsTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): int64 =
+```
+
+____
+
+```nim
+iterator fastRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): Row =
+```
+
+____
+
+
+# Convert result to types
+
+The `totypes` module contains procs to convert the result to types.
+
+```nim
+type
+  Person = ref object
+    id: int
+    name: string
+    age: int
+    ident: string
+    is_nimmer: bool
+
+let
+  columns = @["name","id","ident"]
+  val = db.getRow(sql("SELECT " & columns.join(",") & " FROM my_table WHERE id = 1"))
+  res = sqlToType(Person, columns, val)
+```
 
 
 # Examples
