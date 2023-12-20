@@ -1,6 +1,3 @@
-# Copyright 2019 - Thomas T. Jarløv
-
-
 
 import sqlbuilderpkg/utils
 export utils
