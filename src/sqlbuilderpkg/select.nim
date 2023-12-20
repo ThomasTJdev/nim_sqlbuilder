@@ -1,22 +1,20 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
   std/macros,
   std/strutils
 
 import
-  ./utils,
   ./utils_private
 
+from ./utils import SQLJoinType, ArgsContainer
 
-
+const noJoin*: tuple[table: string, tableAs: string, on: seq[string]] = ("", "", @[])
 
 
 ##
@@ -31,10 +29,7 @@ proc sqlSelectConstSelect(select: varargs[string]): string =
 
 proc sqlSelectConstJoin(
     joinargs: varargs[tuple[table: string, tableAs: string, on: seq[string]]],
-    jointype: NimNode,
-    # tablesWithDeleteMarker: varargs[string],
-    # hideIsDeleted: NimNode,
-    # deleteMarker: NimNode,
+    jointype: NimNode
   ): string =
   var lef = ""
 
@@ -58,36 +53,16 @@ proc sqlSelectConstJoin(
         lef.add(" AND ")
       lef.add($join)
 
-    # if $hideIsDeleted == "true" and tablesWithDeleteMarker.len() > 0:
-    #   var hit = false
-    #   for t in tablesWithDeleteMarker:
-    #     if t.repr.len == 0 or tablesWithDeleteMarker.len() == 2:
-    #       continue
-
-    #     if $t == $d.table:
-    #       hit = true
-    #       break
-
-    #   if hit:
-    #     lef.add(
-    #       " AND " &
-    #       (
-    #         if d.tableAs.len() > 0 and $d.tableAs != $d.table:
-    #           $d.tableAs
-    #         else:
-    #           $d.table
-    #       ) &
-    #       $deleteMarker
-    #     )
-
     lef.add(")")
 
   return lef
 
 
-proc sqlSelectConstWhere(where: varargs[string]): string =
+proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
 
-  var wes = ""
+  var
+    wes = ""
+    prepareCount = 0
 
   for i, d in where:
     let v = $d
@@ -106,19 +81,35 @@ proc sqlSelectConstWhere(where: varargs[string]): string =
 
       # => ? = ANY(...)
       elif v.len() > 5 and v[0..4] == "= ANY":
-        wes.add("? " & v)
+        if boolVal(usePrepared):
+          prepareCount += 1
+          wes.add("$" & $prepareCount & " " & v)
+        else:
+          wes.add("? " & v)
 
       # => ... IN (?)
       elif v[(v.high - 2)..v.high] == " IN":
-        wes.add(v & " (?)")
+        if boolVal(usePrepared):
+          prepareCount += 1
+          wes.add(v & " ($" & $prepareCount & ")")
+        else:
+          wes.add(v & " (?)")
 
       # => ? IN (...)
       elif v.len() > 2 and v[0..1] == "IN":
-        wes.add("? " & v)
+        if boolVal(usePrepared):
+          prepareCount += 1
+          wes.add("$" & $prepareCount & " " & v)
+        else:
+          wes.add("? " & v)
 
       # => ... = ?
       else:
-        wes.add(v & " ?")
+        if boolVal(usePrepared):
+          prepareCount += 1
+          wes.add(v & " $" & $prepareCount)
+        else:
+          wes.add(v & " ?")
 
   return wes
 
@@ -151,18 +142,16 @@ proc sqlSelectConstWhereIn(
 
 proc sqlSelectConstSoft(
     wes, acc: string,
-    # table, tableAs: NimNode,
     tablesInQuery: seq[tuple[table: string, tableAs: string]],
     tablesWithDeleteMarker: varargs[string],
-    hideIsDeleted: NimNode,
+    useDeleteMarker: NimNode,
     deleteMarker: NimNode
   ): (string, string) =
-
-  if $hideIsDeleted == "true" and tablesWithDeleteMarker.len() > 0:
+  if $useDeleteMarker == "true" and tablesWithDeleteMarker.len() > 0:
     var wesTo, accTo: string
 
     for t in tablesInQuery:
-      if t.table notin tablesWithDeleteMarker: # and t.tableAs notin tablesWithDeleteMarker:
+      if t.table notin tablesWithDeleteMarker:
         continue
 
       let toUse = if t.tableAs != "": t.tableAs else: t.table
@@ -178,41 +167,11 @@ proc sqlSelectConstSoft(
 
     return (wesTo, accTo)
 
-    # var hit = false
-    # for t in tablesWithDeleteMarker:
-    #   if t.repr.len == 0 or tablesWithDeleteMarker.len() == 2:
-    #     continue
-
-    #   if $t == $table:
-    #     hit = true
-    #     break
-
-
-    # if hit:
-    #   let tableNameToUse =
-    #       if ($tableAs).len() > 0 and $tableAs != $table:
-    #         $tableAs
-    #       else:
-    #         $table
-
-    #   var wesTo, accTo: string
-
-    #   if wes == "" and acc == "":
-    #     wesTo.add(" WHERE " & $tableNameToUse & $deleteMarker)
-
-    #   elif acc != "":
-    #     accTo.add(" AND " & $tableNameToUse & $deleteMarker)
-
-    #   else:
-    #     wesTo.add(" AND " & $tableNameToUse & $deleteMarker)
-
-      # return (wesTo, accTo)
 
 
 ##
 ## Constant generator
 ##
-const deadTuple: tuple[table: string, tableAs: string, on: seq[string]] = ("", "", @[])
 macro sqlSelectConst*(
     # BASE
     table: string,
@@ -231,39 +190,37 @@ macro sqlSelectConst*(
     customSQL: string = "",
 
     # Table alias
-    tableAs: string = "",# = $table,
+    tableAs: string = "",
+
+    # Prepare statement
+    usePrepared: bool = false,
 
     # Soft delete
-    hideIsDeleted: bool = true,
-    tablesWithDeleteMarker: static varargs[string] = [],
+    useDeleteMarker: bool = true,
+    # If we are using `static` then we can assign const-variables to it. It not,
+    # we must use direct varargs.
+    tablesWithDeleteMarker: varargs[string] = [],
     deleteMarker = ".is_deleted IS NULL",
-    testValue: string = "",
   ): SqlQuery =
   ## SQL builder for SELECT queries
 
 
-  #
-  # Set delete fields
-  #
-  # 1) macro options
-  # 2) default options set outside macro
-  #
 
   var deleteMarkersFields: seq[string]
-  if $(tablesWithDeleteMarker.repr) != "[]":
+  if tablesWithDeleteMarker.len() > 0:
     for t in tablesWithDeleteMarker:
-      if t.repr.len == 0:# or tablesWithDeleteMarker.len() == 2:
+      if t.repr.len == 0:
+        continue
+      if $t notin deleteMarkersFields:
+        deleteMarkersFields.add($t)
+
+  when declared(tablesWithDeleteMarkerInit):
+    for t in tablesWithDeleteMarkerInit:
+      if t.repr.len == 0:
         continue
       if t notin deleteMarkersFields:
         deleteMarkersFields.add(t)
 
-  when declared(tablesWithDeleteMarkerInit):
-    if $(tablesWithDeleteMarker.repr) != "[]":
-      for t in tablesWithDeleteMarkerInit:
-        if t.repr.len == 0:# or tablesWithDeleteMarkerInit.len() == 2:
-          continue
-        if t notin deleteMarkersFields:
-          deleteMarkersFields.add(t)
 
   #
   # Create seq of tables
@@ -278,9 +235,9 @@ macro sqlSelectConst*(
 
   # Join table
   var joinTablesUsed: seq[string]
-  if joinargs != [] and $(joinargs.repr) != "[]":
+  if joinargs[0] != noJoin and joinargs != [] and $(joinargs.repr) != "[]":
     for i, d in joinargs:
-      if d.repr.len == 0:# or joinargs.len() == 2:
+      if d.repr.len == 0:
         continue
 
       if $d.table in joinTablesUsed:
@@ -313,96 +270,20 @@ macro sqlSelectConst*(
       "Bug: `select.len() == 0` in \n" & $select
     )
   var res = sqlSelectConstSelect(select)
-  # var res = "SELECT "
-
-  # for i, d in select:
-  #   if i > 0: res.add(", ")
-  #   res.add($d)
 
 
   #
   # Joins
   #
-  var lef = sqlSelectConstJoin(
-      joinargs, jointype)
-      # deleteMarkersFields, hideIsDeleted, deleteMarker)
-  # var lef = ""
-
-  # for d in joinargs:
-  #   if d.repr.len == 0 and joinargs.len() == 2:
-  #     break
-
-  #   lef.add(" " & $jointype & " JOIN ")
-  #   lef.add($d.table & " ")
-
-  #   if d.tableAs != "" and d.tableAs != d.table:
-  #     lef.add("AS " & $d.tableAs & " ")
-
-  #   lef.add("ON (")
-
-  #   for i, join in d.on:
-  #     if i > 0:
-  #       lef.add(" AND ")
-  #     lef.add($join)
-
-  #   if $hideIsDeleted == "true" and tablesWithDeleteMarker.len() > 0:
-  #     var hit = false
-  #     for t in tablesWithDeleteMarker:
-  #       if $t == $d.table:
-  #         hit = true
-  #         break
-
-  #     if hit:
-  #       lef.add(
-  #         " AND " &
-  #         (
-  #           if d.tableAs.len() > 0 and $d.tableAs != $d.table:
-  #             $d.tableAs
-  #           else:
-  #             $d.table
-  #         ) &
-  #         $deleteMarker
-  #       )
-
-  #   lef.add(")")
+  var lef = ""
+  if joinargs[0] != noJoin:
+    lef = sqlSelectConstJoin(joinargs, jointype)
 
 
   #
   # Where - normal
   #
-  var wes = sqlSelectConstWhere(where)
-  # var wes = ""
-
-  # for i, d in where:
-  #   let v = $d
-
-  #   if v.len() > 0 and i == 0:
-  #     wes.add(" WHERE ")
-
-  #   if i > 0:
-  #     wes.add(" AND ")
-
-  #   if v.len() > 0:
-
-  #     # => ... = NULL
-  #     if v[(v.high - 3)..v.high] == "NULL":
-  #       wes.add(v)
-
-  #     # => ? = ANY(...)
-  #     elif v.len() > 5 and v[0..4] == "= ANY":
-  #       wes.add("? " & v)
-
-  #     # => ... IN (?)
-  #     elif v[(v.high - 2)..v.high] == " IN":
-  #       wes.add(v & " (?)")
-
-  #     # => ? IN (...)
-  #     elif v.len() > 2 and v[0..1] == "IN":
-  #       wes.add("? " & v)
-
-  #     # => ... = ?
-  #     else:
-  #       wes.add(v & " ?")
+  var wes = sqlSelectConstWhere(where, usePrepared)
 
 
 
@@ -410,26 +291,7 @@ macro sqlSelectConst*(
   # Where - n IN (x,c,v)
   #
   var acc = ""
-
   acc.add sqlSelectConstWhereIn(wes, acc, whereInField, whereInValue)
-
-  # if ($whereInField).len() > 0 and (whereInValue).len() > 0:
-  #   if wes.len == 0:
-  #     acc.add(" WHERE " & $whereInField & " in (")
-  #   else:
-  #     acc.add(" AND " & $whereInField & " in (")
-
-
-  #   var inVal: string
-
-  #   for a in whereInValue:
-  #     if inVal != "":
-  #       inVal.add(",")
-  #     inVal.add($a)
-
-  #   acc.add(if inVal == "": "0" else: inVal)
-  #   acc.add(")")
-
 
 
   #
@@ -437,34 +299,12 @@ macro sqlSelectConst*(
   #
   var (toWes, toAcc) = sqlSelectConstSoft(
       wes, acc,
-      # table, tableAs,
       tablesInQuery,
       deleteMarkersFields,
-      hideIsDeleted, deleteMarker
+      useDeleteMarker, deleteMarker
     )
   wes.add(toWes)
   acc.add(toAcc)
-  # if $hideIsDeleted == "true" and tablesWithDeleteMarker.len() > 0:
-  #   var hit = false
-  #   for t in tablesWithDeleteMarker:
-  #     if $t == $table:
-  #       hit = true
-  #       break
-
-  #   if hit:
-  #     let tableNameToUse =
-  #         if ($tableAs).len() > 0 and $tableAs != $table:
-  #           $tableAs
-  #         else:
-  #           $table
-
-  #     if wes == "" and acc == "":
-  #       wes.add(" WHERE " & $tableNameToUse & $deleteMarker)
-  #     elif acc != "":
-  #       acc.add(" AND " & $tableNameToUse & $deleteMarker)
-  #     else:
-  #       wes.add(" AND " & $tableNameToUse & $deleteMarker)
-
 
   #
   # Combine the pretty SQL
@@ -475,47 +315,25 @@ macro sqlSelectConst*(
   #
   # Error checking
   #
-  # => Bad format
-  const illegalFormats = [
-    "WHERE AND",
-    "WHERE OR",
-    "AND AND",
-    "OR OR",
-    "AND OR",
-    "OR AND",
-    "WHERE IN",
-    "WHERE =",
-    "WHERE >",
-    "WHERE <",
-    "WHERE !",
-    "WHERE LIKE",
-    "WHERE NOT",
-    "WHERE IS",
-    "WHERE NULL",
-    "WHERE ANY"
-  ]
 
-  for f in illegalFormats:
-    if f in finalSQL:
-      raise newException(
-        Exception,
-        "Bad SQL format. Please check your SQL statement. " &
-        "This is most likely caused by a missing WHERE clause. " &
-        "Bug: `" & f & "` in \n" & finalSQL
-      )
+  var illegal = hasIllegalFormats($finalSQL)
+  if illegal.len() > 0:
+    raise newException(
+      Exception,
+      "Bad SQL format. Please check your SQL statement. " &
+      "This is most likely caused by a missing WHERE clause. " &
+      "Bug: `" & illegal & "` in \n" & finalSQL
+    )
 
   if $table != $tableAs and lef.len() > 0:
     var hit: bool
     for s in select:
       if "." notin s:
-        echo "WARNING: Missing table alias in select statement: " & $s
+        echo "WARNING (SQL MACRO): Missing table alias in select statement: " & $s
         hit = true
     if hit:
-      echo "WARNING: " & finalSQL
+      echo "WARNING (SQL MACRO): " & finalSQL
 
-  when defined(verboseSqlquery):
-    echo "SQL Macro:"
-    echo finalSQL
 
 
   result = parseStmt("sql(\"" & finalSQL & "\")")
@@ -529,38 +347,40 @@ proc sqlSelect*(
     table: string,
     select: varargs[string],
     where: varargs[string],
+
     # Join
     joinargs: varargs[tuple[table: string, tableAs: string, on: seq[string]]] = [],
     jointype: SQLJoinType = LEFT,
-    joinoverride: string = "",
+    joinoverride: string = "",    # Override the join statement by inserting without check
+
     # WHERE-IN
     whereInField: string = "",
-    whereInValue: seq[string] = @[],       # Could be unsafe. Is not checked.
+    whereInValue: varargs[string] = [],       # Could be unsafe. Is not checked.
     whereInValueString: seq[string] = @[],
     whereInValueInt: seq[int] = @[],
+
     # Custom SQL, e.g. ORDER BY
     customSQL: string = "",
+
     # Null checks
     checkedArgs: ArgsContainer.query = @[],
+
     # Table alias
     tableAs: string = table,
+
+    # Prepare statement
+    usePrepared: bool = false,
+
     # Soft delete
-    hideIsDeleted: bool = true,
+    useDeleteMarker: bool = true,
     tablesWithDeleteMarker: varargs[string] = [], #(when declared(tablesWithDeleteMarkerInit): tablesWithDeleteMarkerInit else: []), #@[],
     deleteMarker = ".is_deleted IS NULL",
   ): SqlQuery =
   ## SQL builder for SELECT queries
 
-  #
-  # Set delete fields
-  #
-  # 1) macro options
-  # 2) default options set outside macro
-  #
+
   var deleteMarkersFields: seq[string]
   for t in tablesWithDeleteMarker:
-    # if t.repr.len == 0 or tablesWithDeleteMarker.len() == 2:
-    #   continue
     if t == "":
       continue
     if t notin deleteMarkersFields:
@@ -570,8 +390,6 @@ proc sqlSelect*(
     for t in tablesWithDeleteMarkerInit:
       if t == "":
         continue
-      # if t.repr.len == 0 or tablesWithDeleteMarkerInit.len() == 2:
-        # continue
       if t notin deleteMarkersFields:
         deleteMarkersFields.add(t)
 
@@ -580,23 +398,23 @@ proc sqlSelect*(
   #
   var tablesInQuery: seq[tuple[table: string, tableAs: string]]
 
+
   # Base table
   if $tableAs != "" and $table != $tableAs:
     tablesInQuery.add(($table, $tableAs))
   else:
     tablesInQuery.add(($table, ""))
 
-  # Join table
-  for d in joinargs:
-    # if d.repr.len == 0 and joinargs.len() == 2:
-    #   continue
-    if d.table == "":
-      continue
-    if d.tableAs != "" and d.tableAs != d.table:
-      tablesInQuery.add((d.table, d.tableAs))
-    else:
-      tablesInQuery.add((d.table, ""))
 
+  # Join table
+  if joinargs.len() > 0 and joinargs[0] != noJoin:
+    for d in joinargs:
+      if d.table == "":
+        continue
+      if d.tableAs != "" and d.tableAs != d.table:
+        tablesInQuery.add((d.table, d.tableAs))
+      else:
+        tablesInQuery.add((d.table, ""))
 
 
   #
@@ -613,7 +431,6 @@ proc sqlSelect*(
   # Select
   #
   var res = "SELECT "
-
   for i, d in select:
     if i > 0: res.add(", ")
     res.add(d)
@@ -623,33 +440,22 @@ proc sqlSelect*(
   # Joins
   #
   var lef = ""
+  if joinargs.len() > 0 and joinargs[0] != noJoin:
+    for i, d in joinargs:
+      lef.add(" " & $jointype & " JOIN ")
+      lef.add(d.table & " ")
 
-  for i, d in joinargs:
-    lef.add(" " & $jointype & " JOIN ")
-    lef.add(d.table & " ")
+      if d.tableAs != "" and d.tableAs != d.table:
+        lef.add("AS " & d.tableAs & " ")
 
-    if d.tableAs != "" and d.tableAs != d.table:
-      lef.add("AS " & d.tableAs & " ")
+      lef.add("ON (")
 
-    lef.add("ON (")
+      for i, join in d.on:
+        if i > 0:
+          lef.add(" AND ")
+        lef.add(join)
 
-    for i, join in d.on:
-      if i > 0:
-        lef.add(" AND ")
-      lef.add(join)
-
-    # if hideIsDeleted and tablesWithDeleteMarker.len() > 0 and d.table in tablesWithDeleteMarker:
-    #   lef.add(
-    #     " AND " &
-    #     (
-    #       if d.tableAs != "" and d.tableAs != d.table:
-    #         d.tableAs
-    #       else:
-    #         d.table
-    #     ) &
-    #     deleteMarker
-    #   )
-    lef.add(")")
+      lef.add(")")
 
   if joinoverride.len() > 0:
     lef.add(" " & joinoverride)
@@ -658,7 +464,9 @@ proc sqlSelect*(
   #
   # Where - normal
   #
-  var wes = ""
+  var
+    wes = ""
+    prepareCount = 0
   for i, d in where:
     if d != "" and i == 0:
       wes.add(" WHERE ")
@@ -677,26 +485,41 @@ proc sqlSelect*(
 
       # => ? = ANY(...)
       elif d.len() > 5 and d[0..4] == "= ANY":
-        wes.add("? " & d)
+        if usePrepared:
+          prepareCount += 1
+          wes.add("$" & $prepareCount & " " & d)
+        else:
+          wes.add("? " & d)
 
       # => ... IN (?)
       elif d[(d.high - 2)..d.high] == " IN":
-        wes.add(d & " (?)")
+        if usePrepared:
+          prepareCount += 1
+          wes.add(d & " ($" & $prepareCount & ")")
+        else:
+          wes.add(d & " (?)")
 
       # => ? IN (...)
       elif d.len() > 2 and d[0..1] == "IN":
-        wes.add("? " & d)
+        if usePrepared:
+          prepareCount += 1
+          wes.add("$" & $prepareCount & " " & d)
+        else:
+          wes.add("? " & d)
 
       # => ... = ?
       else:
-        wes.add(d & " ?")
+        if usePrepared:
+          prepareCount += 1
+          wes.add(d & " $" & $prepareCount)
+        else:
+          wes.add(d & " ?")
 
 
   #
   # Where IN
   #
   var acc = ""
-
   if whereInField != "" and (whereInValue.len() > 0 or whereInValueString.len() > 0 or whereInValueInt.len() > 0):
     if wes.len == 0:
       acc.add(" WHERE " & whereInField & " in (")
@@ -738,11 +561,10 @@ proc sqlSelect*(
 
 
 
-
   #
   # Soft delete
   #
-  if hideIsDeleted and deleteMarkersFields.len() > 0:
+  if useDeleteMarker and deleteMarkersFields.len() > 0:
     for t in tablesInQuery:
       if t.table notin deleteMarkersFields:
         continue
@@ -759,28 +581,34 @@ proc sqlSelect*(
         wes.add(" AND " & toUse & $deleteMarker)
 
 
-    # let tableNameToUse =
-    #     if tableAs.len() > 0 and tableAs != table:
-    #       tableAs
-    #     else:
-    #       table
-
-    # if wes == "" and acc == "":
-    #   wes.add(" WHERE " & tableNameToUse & deleteMarker)
-    # elif acc != "":
-    #   acc.add(" AND " & tableNameToUse & deleteMarker)
-    # else:
-    #   wes.add(" AND " & tableNameToUse & deleteMarker)
 
 
+  when defined(dev):
+
+    let sqlString = res & " FROM " & tableName & lef & wes & acc & " " & customSQL
+
+    let illegal = hasIllegalFormats(sqlString)
+    if illegal.len() > 0:
+      raise newException(
+        Exception,
+        "Bad SQL format. Please check your SQL statement. " &
+        "This is most likely caused by a missing WHERE clause. " &
+        "Bug: `" & illegal & "` in \n" & sqlString
+      )
 
 
-
-  #
-  # Finalize
-  when defined(verboseSqlquery):
-    echo res & " FROM " & tableName & lef & wes & acc & " " & customSQL
-
+    # Check for missing table alias
+    if (
+      (tableAs != "" and table != tableAs) or
+      (joinargs.len() > 0 and joinargs[0] != noJoin)
+    ):
+      var hit: bool
+      for s in select:
+        if "." notin s:
+          echo "WARNING (SQL SELECT): Missing table alias in select statement: " & $s
+          hit = true
+      if hit:
+        echo "WARNING (SQL SELECT): " & sqlString
 
   result = sql(res & " FROM " & tableName & lef & wes & acc & " " & customSQL)
 
@@ -799,8 +627,8 @@ proc sqlSelect*(
     access: string, accessC: string,
     user: string,
     args: ArgsContainer.query = @[],
-    hideIsDeleted: bool = true,
-    tablesWithDeleteMarker: varargs[string] = [], #(when declared(tablesWithDeleteMarkerInit): tablesWithDeleteMarkerInit else: []), #@[],
+    useDeleteMarker: bool = true,
+    tablesWithDeleteMarker: varargs[string] = [],
     deleteMarker = ".is_deleted IS NULL",
   ): SqlQuery {.deprecated.} =
   ##
@@ -858,7 +686,7 @@ proc sqlSelect*(
     whereInValue = @[access],
     customSQL = user,
     checkedArgs = args,
-    hideIsDeleted = hideIsDeleted,
+    useDeleteMarker = useDeleteMarker,
     tablesWithDeleteMarker = tablesWithDeleteMarker,
     deleteMarker = deleteMarker
   )
