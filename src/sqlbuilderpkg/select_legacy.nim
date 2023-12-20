@@ -1,11 +1,9 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
   std/macros,
@@ -21,9 +19,15 @@ import
 
 
 proc sqlSelect*(
-    table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string,
+    table: string,
+    data: varargs[string],
+    left: varargs[string],
+    whereC: varargs[string],
+    access: string,
+    accessC: string,
+    user: string,
     args: ArgsContainer.query = @[],
-    hideIsDeleted: bool = true,
+    useDeleteMarker: bool = true,
     tablesWithDeleteMarker: varargs[string] = (when declared(tablesWithDeleteMarkerInit): tablesWithDeleteMarkerInit else: []), #@[],
     deleteMarker = ".is_deleted IS NULL",
   ): SqlQuery {.deprecated.} =
@@ -84,13 +88,16 @@ proc sqlSelect*(
     whereInValue = @[access],
     customSQL = user,
     checkedArgs = args,
-    hideIsDeleted = hideIsDeleted,
+    useDeleteMarker = useDeleteMarker,
     tablesWithDeleteMarker = tablesWithDeleteMarker,
     deleteMarker = deleteMarker
   )
 
 
 #[
+##
+## Raw legacy procedure
+##
 proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string): SqlQuery =
   ## SQL builder for SELECT queries
   ## Does NOT check for NULL values
@@ -193,7 +200,15 @@ proc sqlSelect*(table: string, data: varargs[string], left: varargs[string], whe
   result = sql(res & " FROM " & table & lef & wes & acc & " " & user)
 ]#
 
-macro sqlSelectMacro*(table: string, data: varargs[string], left: varargs[string], whereC: varargs[string], access: string, accessC: string, user: string): SqlQuery {.deprecated.} =
+macro sqlSelectMacro*(
+    table: string,
+    data: varargs[string],
+    left: varargs[string],
+    whereC: varargs[string],
+    access: string,
+    accessC: string,
+    user: string
+  ): SqlQuery {.deprecated.} =
   ## SQL builder for SELECT queries
   ## Does NOT check for NULL values
 
