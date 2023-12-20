@@ -24,6 +24,7 @@ ease the creating of queries.
   - [Examples (UPDATE)](#examples-update)
   - [Examples (SELECT)](#examples-select)
 - Utilities
+  - [Custom args](#custom-args)
   - [Dynamic selection of columns](#dynamic-selection-of-columns)
   - [Query calls for the lazy](#query-calls-for-the-lazy)
   - [Convert result to types](#convert-result-to-types)
@@ -42,11 +43,14 @@ import sqlbuilder
 import sqlbuilder/select
 ```
 
+## Import and set global soft delete marker
+```nim
+const tablesWithDeleteMarkerInit = ["table_with_deletemarker"]
+include src/sqlbuilder_include
+```
+
 ## Import all but with legacy softdelete fix
 ```nim
-# nano sqlfile.nim
-# import this file instead of sqlbuilder
-
 import src/sqlbuilder/sqlbuilderpkg/insert
 export insert
 
@@ -69,28 +73,48 @@ include src/sqlbuilderpkg/select
 
 # Macro generated queries
 
-The library supports generating some queries with a macro, which improves the
+The library supports generating some queries with a macro which can improve the
 performance due to query being generated on compile time.
-
-The macro generated
-queries **do not** accept the `genArgs()` and `genArgsColumns()` due to not
-being available on compile time - so there's currently not NULL-support for
-macros.
 
 
 
 # NULL values
 
-The `genArgs` and `genArgsSetNull` allows you to pass NULL values to the queries.
-These are now only needed for insert-queries.
+After Nim's update to 0.19.0, the check for NULL values was removed
+due to the removal of `nil`.
 
+You can use `NULL` values in different ways. See the examples.
 
-## A NULL value
+## Inline in query
+
+```nim
+sqlSelect(
+      table     = "tasks",
+      tableAs   = "t",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id =", "name != NULL", "description = NULL"],
+      useDeleteMarker = false
+    )
+check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != NULL AND description = NULL "))
+```
+
+```nim
+sqlUpdate(
+      "table",
+      ["name", "age", "info = NULL"],
+      ["id ="],
+    )
+check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info = NULL WHERE id = ?"))
+```
+
+## Custom args
+
+### A NULL value
 
 The global ``const dbNullVal`` represents a NULL value. Use ``dbNullVal``
-in your args, if you need to insert/update to a NULL value.
+in your args if you need to insert/update to a NULL value.
 
-## Insert value or NULL
+### Insert value or NULL
 
 The global ``proc dbValOrNull()`` will check, if it contains a value
 or is empty. If it contains a value, the value will be used in the args,
@@ -98,111 +122,16 @@ otherwise a NULL value (``dbNullVal``) will be used.
 
 ``dbValOrNull()`` accepts all types due to `value: auto`.
 
-## Auto NULL-values
+### Auto NULL-values
 
 There are two generators, which can generate the `NULL` values for you.
 
 * `genArgs` does only set a field to `NULL` if `dbNullVal`/`dbValOrNull()` is passed.
 * `genArgsSetNull` sets empty field (`""` / `c.len() == 0`) to `NULL`.
 
-## Executing DB commands
-
-The examples below support the various DB commands such as ``exec``,
-``tryExec``, ``insertID``, ``tryInsertID``, etc.
-
-
-# Examples (NULL values)
-
-All the examples uses a table named: ``myTable`` and they use the WHERE argument on: ``name``.
-
-
-## Update string & int
-
-### Version 1
-*Required if NULL values could be expected*
-```nim
- let a = genArgs("em@em.com", 20, "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> string, int
- # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
-```
-
-
-### Version 2
-```nim
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"]), "em@em.com", 20, "John")
- # ==> string, int
- # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
-```
-
-
-### Version 3
-```nim
- let a = genArgsSetNull("em@em.com", "", "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> string, NULL
- # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
-```
-
-
-## Update NULL & int
-
-```nim
- let a = genArgs("", 20, "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> NULL, int
- # ==> UPDATE myTable SET email = NULL, age = ? WHERE name = ?
-```
-
-
-## Update string & NULL
-
-```nim
- a = genArgs("aa@aa.aa", dbNullVal, "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> string, NULL
- # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
-```
-
-
-## Error: Update string & NULL into an integer column
-
-An empty string, "", will be inserted into the database as NULL.
-Empty string cannot be used for an INTEGER column. You therefore
-need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
-
-This is due to, that the library does not know you DB-architecture, so it
-is your responsibility to respect the columns.
-
-```nim
- a = genArgs("aa@aa.aa", "", "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> string, ERROR
- # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
- # ==> To insert a NULL into a int-field, it is required to use dbValOrNull()
- #     or dbNullVal, it is only possible to pass and empty string.
-```
-
-
-## Update NULL & NULL
-
-```nim
- let cc = ""
- a = genArgs(dbValOrNull(cc), dbValOrNull(cc), "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> NULL, NULL
- # ==> UPDATE myTable SET email = NULL, age = NULL WHERE name = ?
-```
 
 
 
-## Update unknow value - maybe NULL
-
-```nim
- a = genArgs(dbValOrNull(var1), dbValOrNull(var2), "John")
- exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
- # ==> AUTO or NULL, AUTO or NULL, string
-```
 
 
 
@@ -212,25 +141,29 @@ is your responsibility to respect the columns.
 ## Insert default
 
 ```nim
- exec(db, sqlInsert("myTable", ["email", "age"]), "em@em.com" , 20)
- # OR
- insertID(db, sqlInsert("myTable", ["email", "age"]), "em@em.com", 20)
- # ==> INSERT INTO myTable (email, age) VALUES (?, ?)
-```
-```nim
- exec(db, sqlInsertMacro("myTable", ["email", "age"]), "em@em.com" , 20)
- # OR
- insertID(db, sqlInsertMacro("myTable", ["email", "age"]), "em@em.com", 20)
- # ==> INSERT INTO myTable (email, age) VALUES (?, ?)
+test = sqlInsert("my-table", ["name", "age"])
+check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (?, ?)"))
 ```
 
-## Insert with NULL
+```nim
+test = sqlInsert("my-table", ["name", "age = NULL"])
+check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (?, NULL)"))
+```
+
+```nim
+let vals = @["thomas", ""]
+test = sqlInsert("my-table", ["name", "age"], vals)
+check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (?, NULL)"))
+```
+
+```nim
+test = sqlInsertMacro("my-table", ["name", "age = NULL"])
+check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (?, NULL)"))
+```
 
 ```nim
  let a = genArgs("em@em.com", dbNullVal)
  exec(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
- # OR
- insertID(db, sqlInsert("myTable", ["email", "age"], a.query), a.args)
  # ==> INSERT INTO myTable (email) VALUES (?)
 ```
 
@@ -238,9 +171,39 @@ is your responsibility to respect the columns.
 # Examples (UPDATE)
 
 ```nim
-  # sqlUpdate or sqlUpdateMacro
-  let q = sqlUpdate("table", ["name", "age", "info = NULL"], ["id ="])
-  # ==> UPDATE table SET name = ?, age = ?, info = NULL WHERE id = ?
+let q = sqlUpdate(
+      "table",
+      ["name", "age", "info"],
+      ["id ="],
+    )
+check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info = ? WHERE id = ?"))
+```
+
+```nim
+let q = sqlUpdate(
+      "table",
+      ["name", "age", "info = NULL"],
+      ["id ="],
+    )
+check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info = NULL WHERE id = ?"))
+```
+
+```nim
+let q = sqlUpdate(
+      "table",
+      ["name = NULL", "age", "info = NULL"],
+      ["id =", "epoch >", "parent IS NULL", "name IS NOT NULL", "age != 22", "age !="],
+    )
+check querycompare(q, sql("UPDATE table SET name = NULL, age = ?, info = NULL WHERE id = ? AND epoch > ? AND parent IS NULL AND name IS NOT NULL AND age != 22 AND age != ?"))
+```
+
+```nim
+let q = sqlUpdate(
+      "table",
+      ["parents = ARRAY_APPEND(id, ?)", "age = ARRAY_REMOVE(id, ?)", "info = NULL"],
+      ["last_name NOT IN ('Anderson', 'Johnson', 'Smith')"],
+    )
+check querycompare(q, sql("UPDATE table SET parents = ARRAY_APPEND(id, ?), age = ARRAY_REMOVE(id, ?), info = NULL WHERE last_name NOT IN ('Anderson', 'Johnson', 'Smith')"))
 ```
 
 ```nim
@@ -253,40 +216,15 @@ is your responsibility to respect the columns.
   # ==> UPDATE table SET name = NULL, age = ?, info = NULL WHERE id = ? AND epoch > ? AND parent IS NULL AND name IS NOT NULL AND age != 22 AND age != ?
 ```
 
+```nim
+let a2 = genArgsSetNull("hje", "")
+let q = sqlUpdate("my-table", ["name", "age"], ["id"], a2.query)
+check querycompare(q, sql("UPDATE my-table SET name = ?, age = NULL WHERE id = ?"))
+```
 
 
 
 # Examples (SELECT)
-
-Please note that you have to define the equal symbol for the where clause. This
-allows you to use `=`, `!=`, `>`, `<`, etc.
-
-## Select query builder
-
-The SELECT builder gives access to the following fields:
-
-* BASE
-  * table: string,
-  * select: varargs[string],
-  * where: varargs[string],
-* JOIN
-  * joinargs: varargs[tuple[table: string, tableAs: string, on: seq[string]]] = [],
-  * jointype: SQLJoinType = LEFT,
-* WHERE IN
-  * whereInField: string = "",
-  * whereInValue: seq[string] = @[],
-  * whereInValueString: seq[string] = @[],
-  * whereInValueInt: seq[int] = @[],
-* Custom SQL, e.g. ORDER BY
-  * customSQL: string = "",
-* Null checks
-  * checkedArgs: ArgsContainer.query = @[],
-* Table alias
-  * tableAs: string = table,
-* Soft delete
-  * hideIsDeleted: bool = true,
-  * tablesWithDeleteMarker: varargs[string] = @[],
-  * deleteMarker = ".is_deleted IS NULL",
 
 ## Example on builder
 ```nim
@@ -397,6 +335,97 @@ check querycompare(test, sql("""
 
 
 
+# Custom args
+## Update string & int
+
+### Version 1
+*Required if NULL values could be expected*
+```nim
+ let a = genArgs("em@em.com", 20, "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> string, int
+ # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
+```
+
+
+### Version 2
+```nim
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"]), "em@em.com", 20, "John")
+ # ==> string, int
+ # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
+```
+
+
+### Version 3
+```nim
+ let a = genArgsSetNull("em@em.com", "", "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> string, NULL
+ # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
+```
+
+
+## Update NULL & int
+
+```nim
+ let a = genArgs("", 20, "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> NULL, int
+ # ==> UPDATE myTable SET email = NULL, age = ? WHERE name = ?
+```
+
+
+## Update string & NULL
+
+```nim
+ a = genArgs("aa@aa.aa", dbNullVal, "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> string, NULL
+ # ==> UPDATE myTable SET email = ?, age = NULL WHERE name = ?
+```
+
+
+## Error: Update string & NULL into an integer column
+
+An empty string, "", will be inserted into the database as NULL.
+Empty string cannot be used for an INTEGER column. You therefore
+need to use the ``dbValOrNull()`` or ``dbNullVal`` for ``int-values``.
+
+This is due to, that the library does not know you DB-architecture, so it
+is your responsibility to respect the columns.
+
+```nim
+ a = genArgs("aa@aa.aa", "", "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> string, ERROR
+ # ==> UPDATE myTable SET email = ?, age = ? WHERE name = ?
+ # ==> To insert a NULL into a int-field, it is required to use dbValOrNull()
+ #     or dbNullVal, it is only possible to pass and empty string.
+```
+
+
+## Update NULL & NULL
+
+```nim
+ let cc = ""
+ a = genArgs(dbValOrNull(cc), dbValOrNull(cc), "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> NULL, NULL
+ # ==> UPDATE myTable SET email = NULL, age = NULL WHERE name = ?
+```
+
+
+
+## Update unknow value - maybe NULL
+
+```nim
+ a = genArgs(dbValOrNull(var1), dbValOrNull(var2), "John")
+ exec(db, sqlUpdate("myTable", ["email", "age"], ["name"], a.query), a.args)
+ # ==> AUTO or NULL, AUTO or NULL, string
+```
+
+
+
 # Dynamic selection of columns
 Select which columns to include.
 
@@ -455,6 +484,9 @@ This should only be used if:
   - You can live with a default value in case of an error
   - You have no other way to catch the error
   - You are to lazy to write the try-except procs yourself
+
+!! These are not available if you use external libraries, e.g. `waterpark`,
+!! since they rely on default`DbConn`.
 
 ## Import
 
