@@ -21,6 +21,10 @@ type
     RIGHT
     FULL
 
+  SQLQueryType* = enum
+    INSERT
+    UPDATE
+
   SQLJoinObject* = ref object
     joinType*: SQLJoinType
     table*: string
@@ -127,7 +131,7 @@ template genArgsSetNull*[T](arguments: varargs[T, argType]): ArgsContainer =
   argsContainer
 
 
-template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq[string], args: ArgsContainer] =
+template genArgsColumns*[T](queryType: SQLQueryType, arguments: varargs[T, argFormat]): tuple[select: seq[string], args: ArgsContainer] =
   ## Create argument container for query and passed args and selecting which
   ## columns to update. It's and expansion of `genArgs()`, since you can
   ## decide which columns, there should be included.
@@ -145,6 +149,9 @@ template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq
   ## columns which shall be updated. When importing your spreadsheet, check
   ## if the column exists (bool), and pass that as the `use: bool` param. If
   ## the column does not exists, it will be skipped in the query.
+  ##
+  ## The objects `ArgsFormat` is:
+  ## (use: bool, column: string, value: ArgObj)
   var
     select: seq[string]
     argsContainer: ArgsContainer
@@ -154,10 +161,15 @@ template genArgsColumns*[T](arguments: varargs[T, argFormat]): tuple[select: seq
     let argObject = argType(arg.value)
     if not arg.use:
       continue
+    if (
+      queryType == SQLQueryType.INSERT and
+      (argObject.isNull or argObject.val.len() == 0)
+    ):
+      continue
     if arg.column != "":
       select.add(arg.column)
-    if argObject.isNull:
-      argsContainer.query.add(argObject)
+    if argObject.isNull or argObject.val.len() == 0:
+      argsContainer.query.add(dbNullVal)
     else:
       argsContainer.query.add(argObject)
       argsContainer.args.add(argObject.val)
