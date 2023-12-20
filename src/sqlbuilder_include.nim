@@ -2,7 +2,8 @@
 
 
 
-include sqlbuilderpkg/utils
+import sqlbuilderpkg/utils
+export utils
 
 include sqlbuilderpkg/insert
 
