@@ -1,21 +1,24 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
   std/macros,
   std/strutils
 
 import
-  ./utils
+  ./utils_private
+
+from ./utils import ArgsContainer
 
 
 proc updateSetFormat(v: string): string =
+  ## The table columns that we want to update. Validate whether
+  ## the user has provided equal sign or not.
+
   let
     field = v.strip()
     fieldSplit = field.split("=")
@@ -25,18 +28,22 @@ proc updateSetFormat(v: string): string =
   #
   if fieldSplit.len() == 2:
     #
-    # If the data is only having equal but no value, insert a `?` sign
+    # If the data is only having equal but no value, insert a `?` sign.
+    # Eg. `field =`
     #
     if fieldSplit[1] == "":
       return (field & " ?")
+
     #
     # Otherwise just add the data as is, eg. `field = value`
+    # Eg. `field = value`
     #
     else:
       return (field)
 
   #
   # Otherwise revert to default
+  # Eg. `field = ?`
   #
   else:
     return (field & " = ?")
@@ -44,74 +51,40 @@ proc updateSetFormat(v: string): string =
 
 
 proc updateSet(data: varargs[string]): string =
+  ## Update the SET part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `SET name = ?, age = ?`
+  ##
   for i, d in data:
     if i > 0:
       result.add(", ")
-
     result.add(updateSetFormat(d))
-
   return result
 
 
-proc updateWhereFormat(v: string): string =
-  let
-    field = v.strip()
-
-  var fieldSplit: seq[string]
-  if field.contains(" "):
-    if field.contains("="):
-      fieldSplit = field.split("=")
-    elif field.contains("IS NOT"):
-      fieldSplit = field.split("IS NOT")
-    elif field.contains("IS"):
-      fieldSplit = field.split("IS")
-    elif field.contains("NOT IN"):
-      fieldSplit = field.split("NOT IN")
-    elif field.contains("IN"):
-      fieldSplit = field.split("IN")
-    elif field.contains("!="):
-      fieldSplit = field.split("!=")
-    elif field.contains("<="):
-      fieldSplit = field.split("<=")
-    elif field.contains(">="):
-      fieldSplit = field.split(">=")
-    elif field.contains("<"):
-      fieldSplit = field.split("<")
-    elif field.contains(">"):
-      fieldSplit = field.split(">")
-  else:
-    fieldSplit = field.split("=")
-
-  #
-  # Does the data have a `=` sign?
-  #
-  if fieldSplit.len() == 2:
-    #
-    # If the data is only having equal but no value, insert a `?` sign
-    #
-    if fieldSplit[1] == "":
-      return (field & " ?")
-    #
-    # Otherwise just add the data as is, eg. `field = value`
-    #
-    else:
-      return (field)
-
-  #
-  # Otherwise revert to default
-  #
-  else:
-    return (field & " = ?")
+proc updateArray(arrayType: string, arrayAppend: varargs[string]): string =
+  ## Format the arrayAppend part of the query.
+  for i, d in arrayAppend:
+    if i > 0:
+      result.add(", ")
+    result.add(d & " = " & arrayType & "(" & d & ", ?)")
+  return result
 
 
 proc updateWhere(where: varargs[string]): string =
+  ## Update the WHERE part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `WHERE name = ?, age = ?`
+  ##
+  ## => ["name = ", "age >"]
+  ## => `WHERE name = ?, age > ?`
   var wes = " WHERE "
   for i, v in where:
     if i > 0:
       wes.add(" AND ")
-
-    wes.add(updateWhereFormat(v))
-
+    wes.add(formatWhereParams(v))
   return wes
 
 
@@ -141,79 +114,146 @@ proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], ar
     else:
       wes.add(d & " = ?")
 
-  when defined(testSqlquery):
-    echo fields & wes
-
-  when defined(test):
-    testout = fields & wes
-
   result = sql(fields & wes)
 
 
 proc sqlUpdate*(
     table: string,
     data: varargs[string],
-    where: varargs[string]
+    where: varargs[string],
   ): SqlQuery =
   ## SQL builder for UPDATE queries
-  ## Does NOT check for NULL values
-
-  var fields = "UPDATE " & table & " SET "
-
+  ##
+  ## Can utilize custom equal signs and can also check for NULL values
+  ##
+  ## data => ["name", "age = ", "email = NULL"]
+  ## where => ["id = ", "name IS NULL"]
+  var fields: string
   fields.add(updateSet(data))
-
   fields.add(updateWhere(where))
+  result = sql("UPDATE " & table & " SET " & fields)
 
 
-  when defined(testSqlquery):
-    echo fields
+proc sqlUpdateArrayRemove*(
+    table: string,
+    arrayRemove: varargs[string],
+    where: varargs[string],
+  ): SqlQuery =
+  ## ARRAY_REMOVE
+  var fields: string
+  fields.add(updateArray("ARRAY_REMOVE", arrayRemove))
+  fields.add(updateWhere(where))
+  result = sql("UPDATE " & table & " SET " & fields)
 
-  when defined(test):
-    testout = fields
 
-  result = sql(fields)
+proc sqlUpdateArrayAppend*(
+    table: string,
+    arrayAppend: varargs[string],
+    where: varargs[string],
+  ): SqlQuery =
+  ## ARRAY_APPEND
+  var fields: string
+  fields.add(updateArray("ARRAY_APPEND", arrayAppend))
+  fields.add(updateWhere(where))
+  result = sql("UPDATE " & table & " SET " & fields)
 
 
 
-
+#
+#
+# Macro based
+#
+#
 proc updateSet(data: NimNode): string =
+  ## Update the SET part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `SET name = ?, age = ?`
+  ##
   for i, v in data:
     # Convert NimNode to string
     let d = $v
-
     if i > 0:
       result.add(", ")
-
     result.add(updateSetFormat(d))
-
   return result
 
 
+
 proc updateWhere(where: NimNode): string =
+  ## Update the WHERE part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `WHERE name = ?, age = ?`
+  ##
+  ## => ["name = ", "age >"]
+  ## => `WHERE name = ?, age > ?`
   var wes = " WHERE "
   for i, v in where:
     # Convert NimNode to string
     let d = $v
-
     if i > 0:
       wes.add(" AND ")
-
-    wes.add(updateWhereFormat(d))
-
+    wes.add(formatWhereParams(d))
   return wes
 
 
-macro sqlUpdateMacro*(table: string, data: varargs[string], where: varargs[string]): SqlQuery =
+
+macro sqlUpdateMacro*(
+    table: string,
+    data: varargs[string],
+    where: varargs[string]
+  ): SqlQuery =
   ## SQL builder for UPDATE queries
-  ## Does NOT check for NULL values
-
-  var fields = "UPDATE " & $table & " SET "
-
+  ##
+  ## Can utilize custom equal signs and can also check for NULL values
+  ##
+  ## data => ["name", "age = ", "email = NULL"]
+  ## where => ["id = ", "name IS NULL"]
+  var fields: string
   fields.add(updateSet(data))
-
   fields.add(updateWhere(where))
+  result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
 
-  when defined(testSqlquery):
-    echo fields
 
-  result = parseStmt("sql(\"" & fields & "\")")
+#
+# Macro arrays
+#
+proc updateArray(arrayType: string, arrayAppend: NimNode): string =
+  # Format the arrayAppend part of the query.
+
+  for i, v in arrayAppend:
+    let d = $v
+    if d == "":
+      continue
+
+    if i > 0:
+      result.add(", ")
+
+    result.add(d & " = " & $arrayType & "(" & d & ", ?)")
+
+  return result
+
+
+macro sqlUpdateMacroArrayRemove*(
+    table: string,
+    arrayRemove: varargs[string],
+    where: varargs[string],
+  ): SqlQuery =
+  ## ARRAY_REMOVE macro
+  var fields: string
+  fields.add(updateArray("ARRAY_REMOVE", arrayRemove))
+  fields.add(updateWhere(where))
+  result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
+
+
+macro sqlUpdateMacroArrayAppend*(
+    table: string,
+    arrayAppend: varargs[string],
+    where: varargs[string],
+  ): SqlQuery =
+  ## ARRAY_APPEND macro
+  var fields: string
+  fields.add(updateArray("ARRAY_APPEND", arrayAppend))
+  fields.add(updateWhere(where))
+  result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
