@@ -1,18 +1,17 @@
 # Copyright 2020 - Thomas T. Jarløv
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
-  std/macros,
-  std/strutils
+  std/macros
 
 import
-  ./utils
+  ./utils_private
+
+from ./utils import ArgsContainer
 
 
 proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
@@ -24,11 +23,7 @@ proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
   for i, d in where:
     if i > 0:
       wes.add(" AND ")
-    wes.add(d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
+    wes.add(formatWhereParams(d))
   result = sql(res & wes)
 
 
@@ -45,10 +40,6 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
       wes.add(d & " = NULL")
     else:
       wes.add(d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
   result = sql(res & wes)
 
 
@@ -61,9 +52,5 @@ macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
   for i, d in where:
     if i > 0:
       wes.add(" AND ")
-    wes.add($d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
+    wes.add(formatWhereParams($d))
   result = parseStmt("sql(\"" & res & wes & "\")")
