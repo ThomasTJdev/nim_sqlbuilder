@@ -26,7 +26,7 @@ suite "test sqlSelectConst":
       table     = "tasks",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? "))
@@ -41,7 +41,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? "))
@@ -52,7 +52,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["t.id", "t.name", "t.description", "t.created", "t.updated", "t.completed"],
       where     = ["t.id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false,
       customSQL = "ORDER BY t.created DESC"
     )
@@ -68,7 +68,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id =", "name !=", "updated >", "completed IS", "description LIKE"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != ? AND updated > ? AND completed IS ? AND description LIKE ? "))
@@ -80,7 +80,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id =", "name !=", "updated >", "completed IS", "description LIKE"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       customSQL = "AND name != 'test' AND created > ? ",
       useDeleteMarker = false
     )
@@ -97,7 +97,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "ids_array"],
       where     = ["id =", "= ANY(ids_array)"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND ? = ANY(ids_array) "))
@@ -113,7 +113,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "ids_array"],
       where     = ["id =", "= ANY(ids_array)", "= ANY(user_array)", "= ANY(tasks_array)"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND ? = ANY(ids_array) AND ? = ANY(user_array) AND ? = ANY(tasks_array) "))
@@ -129,7 +129,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "ids_array"],
       where     = ["id =", "IN (ids_array)"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND ? IN (ids_array) "))
@@ -141,7 +141,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "ids_array"],
       where     = ["id =", "id IN"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND id IN (?) "))
@@ -157,7 +157,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id =", "name != NULL", "description = NULL"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != NULL AND description = NULL "))
@@ -169,7 +169,7 @@ suite "test sqlSelectConst":
       tableAs   = "t",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id =", "name !=", "description = NULL"],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != ? AND description = NULL "))
@@ -286,7 +286,7 @@ suite "test sqlSelectConst - joins":
       tableAs   = "t",
       select    = ["t.id", "t.name", "t.description", "t.created", "t.updated", "t.completed"],
       where     = ["t.id ="],
-      # joinargs  = [noJoin],
+      # joinargs  = [],
       joinargs  = [
         (table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"]),
         (table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])
@@ -378,7 +378,7 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
       table     = "tasks",
       select    = ["id", "name"],
       where     = ["id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       # joinargs  = [(table: "projects", tableAs: "", on: @["projects.id = tasks.project_id", "projects.status = 1"])],
       # tablesWithDeleteMarker = [] #tableWithDeleteMarkerLet,
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"]
@@ -541,7 +541,7 @@ suite "sqlSelectConst":
       tableAs   = "t",
       select    = ["t.id", "t.name", "t.description", "t.created", "t.updated", "t.completed"],
       where     = ["t.id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"], #tableWithDeleteMarker
     )
 
@@ -651,7 +651,7 @@ suite "sqlSelectConst":
       tableAs   = "t",
       select    = ["t.id", "t.name"],
       where     = ["t.id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       whereInField = "t.name",
       whereInValue = ["'1aa'", "'2bb'", "'3cc'"],
       tablesWithDeleteMarker = ["tasksQ", "history", "tasksitems"], #tableWithDeleteMarker
@@ -673,7 +673,7 @@ suite "sqlSelectConst":
       tableAs   = "t",
       select    = ["t.id", "t.name"],
       where     = ["t.id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       whereInField = "t.id",
       whereInValue = [""],
       tablesWithDeleteMarker = ["tasksQ", "history", "tasksitems"], #tableWithDeleteMarker

@@ -30,7 +30,7 @@ suite "select with tablesWithDeleteMarkerInit init":
       table     = "tasks",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = true
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? AND tasks.is_deleted IS NULL "))
@@ -43,7 +43,7 @@ suite "select with tablesWithDeleteMarkerInit init":
       table     = "tasks",
       select    = ["id", "name", "description", "created", "updated", "completed"],
       where     = ["id ="],
-      joinargs  = [noJoin],
+      joinargs  = [],
       useDeleteMarker = true
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? AND tasks.is_deleted IS NULL "))
