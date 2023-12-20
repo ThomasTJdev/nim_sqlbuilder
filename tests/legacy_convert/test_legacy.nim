@@ -1,39 +1,17 @@
 # Copyright Thomas T. Jarløv (TTJ) - ttj@ttj.dk
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
   std/strutils,
   std/unittest
 
 import
-  src/sqlbuilder
-
-
-
-proc querycompare(a, b: SqlQuery): bool =
-  var
-    a1: seq[string]
-    b1: seq[string]
-  for c in splitWhitespace(string(a)):
-    a1.add($c)
-  for c in splitWhitespace(string(b)):
-    b1.add($c)
-
-  if a1 != b1:
-    echo ""
-    echo "a1: ", string(a)
-    echo "b1: ", string(b).replace("\n", " ").splitWhitespace().join(" ")
-    echo ""
-
-  return a1 == b1
-
-
+  src/sqlbuilder,
+  src/sqlbuilderpkg/utils_private
 
 
 
@@ -163,6 +141,72 @@ suite "legacy - sqlSelect(Convert)":
         ORDER BY
           t.name
       """))
+
+
+  test "complex query":
+
+    var test: SqlQuery
+
+    test = sqlSelect("tasksitems AS tasks",
+        [
+          "tasks.id",
+          "tasks.name",
+          "tasks.status",
+          "tasks.created",
+          "his.id",
+          "his.name",
+          "his.status",
+          "his.created",
+          "projects.id",
+          "projects.name",
+          "person.id",
+          "person.name",
+          "person.email"
+        ],
+        [
+          "history AS his ON his.id = tasks.hid AND his.status = 1",
+          "projects ON projects.id = tasks.project_id AND projects.status = 1",
+          "person ON person.id = tasks.person_id"
+        ],
+        [
+          "projects.id =",
+          "tasks.status >"
+        ],
+        "1,2,3",
+        "tasks.id",
+        "ORDER BY tasks.created DESC"
+      )
+
+    check querycompare(test, (sql("""
+        SELECT
+          tasks.id,
+          tasks.name,
+          tasks.status,
+          tasks.created,
+          his.id,
+          his.name,
+          his.status,
+          his.created,
+          projects.id,
+          projects.name,
+          person.id,
+          person.name,
+          person.email
+        FROM
+          tasksitems AS tasks
+        LEFT JOIN history AS his ON
+          (his.id = tasks.hid AND his.status = 1)
+        LEFT JOIN projects ON
+          (projects.id = tasks.project_id AND projects.status = 1)
+        LEFT JOIN person ON
+          (person.id = tasks.person_id)
+        WHERE
+              projects.id = ?
+          AND tasks.status > ?
+          AND tasks.id in (1,2,3)
+        ORDER BY
+          tasks.created DESC
+      """)))
 
 
 

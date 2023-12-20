@@ -1,37 +1,17 @@
 # Copyright Thomas T. Jarløv (TTJ)
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
   std/strutils,
   std/unittest
 
 import
-  src/sqlbuilder
-
-
-proc querycompare(a, b: SqlQuery): bool =
-  var
-    a1: seq[string]
-    b1: seq[string]
-  for c in splitWhitespace(string(a)):
-    a1.add($c)
-  for c in splitWhitespace(string(b)):
-    b1.add($c)
-
-  if a1 != b1:
-    echo ""
-    echo "a1: ", string(a)
-    echo "b1: ", string(b).replace("\n", " ").splitWhitespace().join(" ")
-    echo ""
-
-  return a1 == b1
-
+  src/sqlbuilder,
+  src/sqlbuilderpkg/utils_private
 
 
 
@@ -39,14 +19,14 @@ proc querycompare(a, b: SqlQuery): bool =
 
 suite "test sqlSelect":
 
-  test "hideIsDeleted = false":
+  test "useDeleteMarker = false":
     var test: SqlQuery
 
     test = sqlSelect(
       table     = "tasks",
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id ="],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? "))
 
@@ -59,7 +39,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id ="],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? "))
 
@@ -69,7 +49,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["t.id", "t.name", "t.description", "t.created", "t.updated", "t.completed"],
       where     = @["t.id ="],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT t.id, t.name, t.description, t.created, t.updated, t.completed FROM tasks AS t WHERE t.id = ? "))
 
@@ -82,7 +62,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id =", "name !=", "updated >", "completed IS", "description LIKE"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != ? AND updated > ? AND completed IS ? AND description LIKE ? "))
     check string(test).count("?") == 5
@@ -94,7 +74,7 @@ suite "test sqlSelect":
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id =", "name !=", "updated >", "completed IS", "description LIKE"],
       customSQL = "AND name != 'test' AND created > ? ",
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != ? AND updated > ? AND completed IS ? AND description LIKE ? AND name != 'test' AND created > ? "))
     check string(test).count("?") == 6
@@ -109,7 +89,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "ids_array"],
       where     = @["id =", "= ANY(ids_array)"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND ? = ANY(ids_array) "))
     check string(test).count("?") == 2
@@ -124,7 +104,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "ids_array"],
       where     = @["id =", "IN (ids_array)"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND ? IN (ids_array) "))
     check string(test).count("?") == 2
@@ -135,7 +115,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "ids_array"],
       where     = @["id =", "id IN"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, ids_array FROM tasks AS t WHERE id = ? AND id IN (?) "))
     check string(test).count("?") == 2
@@ -150,7 +130,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id =", "name != NULL", "description = NULL"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != NULL AND description = NULL "))
     check string(test).count("?") == 1
@@ -161,7 +141,7 @@ suite "test sqlSelect":
       tableAs   = "t",
       select    = @["id", "name", "description", "created", "updated", "completed"],
       where     = @["id =", "name !=", "description = NULL"],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? AND name != ? AND description = NULL "))
     check string(test).count("?") == 2
@@ -179,7 +159,7 @@ suite "test sqlSelect - joins":
       select    = @["id", "name"],
       where     = @["id ="],
       joinargs  = @[(table: "projects", tableAs: "p", on: @["p.id = t.project_id", "p.status = 1"])],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name FROM tasks AS t LEFT JOIN projects AS p ON (p.id = t.project_id AND p.status = 1) WHERE id = ? "))
 
@@ -192,7 +172,7 @@ suite "test sqlSelect - joins":
       select    = @["id", "name"],
       where     = @["id ="],
       joinargs  = @[(table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])],
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name FROM tasks AS t LEFT JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
 
@@ -207,7 +187,7 @@ suite "test sqlSelect - joins":
       where     = @["id ="],
       joinargs  = @[(table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])],
       jointype  = INNER,
-      hideIsDeleted = false
+      useDeleteMarker = false
     )
     check querycompare(test, sql("SELECT id, name FROM tasks AS t INNER JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
 
@@ -286,13 +266,13 @@ suite "test sqlSelect - deletemarkers / softdelete":
   test "complex query":
     var test: SqlQuery
 
-    let tableWithDeleteMarkerLet = @["tasks", "history", "tasksitems"]
+    let tableWithDeleteMarkerLet = @["history", "tasksitems"]
 
 
     test = sqlSelect(
       table     = "tasksitems",
       tableAs   = "tasks",
-      select    = @[
+      select    = [
           "tasks.id",
           "tasks.name",
           "tasks.status",
@@ -307,17 +287,17 @@ suite "test sqlSelect - deletemarkers / softdelete":
           "person.name",
           "person.email"
         ],
-      where     = @[
+      where     = [
           "projects.id =",
           "tasks.status >"
         ],
-      joinargs  = @[
+      joinargs  = [
           (table: "history", tableAs: "his", on: @["his.id = tasks.hid", "his.status = 1"]),
           (table: "projects", tableAs: "", on: @["projects.id = tasks.project_id", "projects.status = 1"]),
           (table: "person", tableAs: "", on: @["person.id = tasks.person_id"])
         ],
       whereInField = "tasks.id",
-      whereInValue = @["1", "2", "3"],
+      whereInValue = ["1", "2", "3"],
       customSQL = "ORDER BY tasks.created DESC",
       tablesWithDeleteMarker = tableWithDeleteMarkerLet
     )

@@ -13,25 +13,21 @@ import
 suite "test formats":
 
   test "genArgsColumns":
-    let (s, a) = genArgsColumns((true, "name", ""), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
+    let (s, a) = genArgsColumns(SQLQueryType.INSERT, (true, "name", ""), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
 
-    assert s == ["name", "age"]
+    check s == ["age"]
 
     for k, v in a.query:
       if k == 0:
-        assert $v == """(val: "", isNull: false)"""
-      if k == 1:
-        assert $v == """(val: "30", isNull: false)"""
-      if k == 3:
-        assert $v == """(val: "154", isNull: false)"""
+        check $v == """(val: "30", isNull: false)"""
+      if k == 2:
+        check $v == """(val: "154", isNull: false)"""
 
     for k, v in a.args:
       if k == 0:
-        assert $v == ""
-      if k == 1:
-        assert $v == "30"
-      if k == 3:
-        assert $v == "154"
+        check $v == "30"
+      if k == 2:
+        check $v == "154"
 
     let a1 = sqlInsert("my-table", s, a.query)
     let a2 = sqlDelete("my-table", s, a.query)

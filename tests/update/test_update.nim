@@ -1,61 +1,58 @@
 # Copyright Thomas T. Jarløv (TTJ) - ttj@ttj.dk
 
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  import db_connector/db_common
 else:
-  import
-    std/db_common
+  import std/db_common
 
 import
-  std/strutils,
   std/unittest
 
 import
-  src/sqlbuilder
-
-
-proc querycompare(a, b: SqlQuery): bool =
-  var
-    a1: seq[string]
-    b1: seq[string]
-  for c in splitWhitespace(string(a)):
-    a1.add($c)
-  for c in splitWhitespace(string(b)):
-    b1.add($c)
-
-  if a1 != b1:
-    echo ""
-    echo "a1: ", string(a)
-    echo "b1: ", string(b).replace("\n", " ").splitWhitespace().join(" ")
-    echo ""
-
-  return a1 == b1
+  src/sqlbuilder,
+  src/sqlbuilderpkg/utils_private
 
 
 
-suite "update":
+suite "update - custom args":
 
-  test "sqlUpdate using genArgs":
+  test "sqlUpdate using genArgs #1":
     let a3 = genArgs("hje", "")
-    discard sqlUpdate("my-table", ["name", "age"], ["id"], a3.query)
-    assert testout == "UPDATE my-table SET name = ?, age = ? WHERE id = ?"
+    let q = sqlUpdate("my-table", ["name", "age"], ["id"], a3.query)
+    check querycompare(q, sql("UPDATE my-table SET name = ?, age = ? WHERE id = ?"))
 
+  test "sqlUpdate using genArgs #2":
     let a4 = genArgs("hje", dbNullVal)
-    discard sqlUpdate("my-table", ["name", "age"], ["id"], a4.query)
-    assert testout == "UPDATE my-table SET name = ?, age = NULL WHERE id = ?"
+    let q2 = sqlUpdate("my-table", ["name", "age"], ["id"], a4.query)
+    check querycompare(q2, sql("UPDATE my-table SET name = ?, age = NULL WHERE id = ?"))
 
-  test "sqlUpdate using genArgsColumns":
-    let (s, a1) = genArgsColumns((true, "name", ""), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
-    discard sqlUpdate("my-table", s, ["id"], a1.query)
-    assert testout == "UPDATE my-table SET name = ?, age = ? WHERE id = ?"
+  test "sqlUpdate using genArgsColumns #1":
+    let (s, a1) = genArgsColumns(SQLQueryType.UPDATE, (true, "name", ""), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
+    let q = sqlUpdate("my-table", s, ["id"], a1.query)
+    check querycompare(q, sql("UPDATE my-table SET name = NULL, age = ? WHERE id = ?"))
+
+  test "sqlUpdate using genArgsColumns #2 - empty string IS NULL (nim-field)":
+    let (s, a1) = genArgsColumns(SQLQueryType.UPDATE, (true, "name", ""), (true, "age", 30), (true, "nim", ""), (true, "", "154"))
+    let q = sqlUpdate("my-table", s, ["id"], a1.query)
+    check querycompare(q, sql("UPDATE my-table SET name = NULL, age = ?, nim = NULL WHERE id = ?"))
+
+  test "sqlUpdate using genArgsColumns #2 - empty string is ignored (nim-field)":
+    let (s, a1) = genArgsColumns(SQLQueryType.UPDATE, (true, "name", ""), (true, "age", 30), (false, "nim", ""), (true, "", "154"))
+    let q = sqlUpdate("my-table", s, ["id"], a1.query)
+    check querycompare(q, sql("UPDATE my-table SET name = NULL, age = ? WHERE id = ?"))
+
+  test "sqlUpdate using genArgsColumns #3":
+    let (s, a1) = genArgsColumns(SQLQueryType.UPDATE, (true, "name", ""), (false, "age", 30), (false, "nim", ""), (true, "", "154"))
+    let q = sqlUpdate("my-table", s, ["id"], a1.query)
+    check querycompare(q, sql("UPDATE my-table SET name = NULL WHERE id = ?"))
 
   test "sqlUpdate using genArgsSetNull":
     let a2 = genArgsSetNull("hje", "")
-    discard sqlUpdate("my-table", ["name", "age"], ["id"], a2.query)
-    assert testout == "UPDATE my-table SET name = ?, age = NULL WHERE id = ?"
+    let q = sqlUpdate("my-table", ["name", "age"], ["id"], a2.query)
+    check querycompare(q, sql("UPDATE my-table SET name = ?, age = NULL WHERE id = ?"))
 
 
+suite "update - queries":
 
   test "update value":
     let q = sqlUpdate(
@@ -130,7 +127,6 @@ suite "update":
 suite "update macro":
 
   test "update value":
-
     let q = sqlUpdateMacro(
       "table",
       ["name", "age", "info"],
@@ -205,3 +201,5 @@ suite "update macro":
       ["last_name NOT IN ('Anderson', 'Johnson', 'Smith')"],
     )
     check querycompare(q, sql("UPDATE table SET parents = ARRAY_APPEND(id, ?), age = ARRAY_REMOVE(id, ?), info = NULL WHERE last_name NOT IN ('Anderson', 'Johnson', 'Smith')"))
+
+
