@@ -10,85 +10,107 @@
 ##
 
 import
-  std/logging,
   std/typetraits
 
+when defined(waterparkPostgres):
+  import waterpark/postgres
+elif defined(waterparkSqlite):
+  import waterpark/sqlite
+
 when NimMajor >= 2:
-  import
-    db_connector/db_common
+  when defined(test):
+    import db_connector/db_sqlite
+  else:
+    import db_connector/db_postgres
 else:
-  import
-    std/db_postgres
-
-
-
-proc getValueTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): string =
-  try:
-    result = getValue(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+  when defined(test):
+    import std/db_sqlite
+  else:
+    import std/db_postgres
 
 
 
 
-proc getAllRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): seq[Row] =
-  try:
-    result = getAllRows(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+when defined(waterparkPostgres) or defined(waterparkSqlite):
+  discard
+
+
+
+else:
+
+  proc getValueTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): string =
+    try:
+      result = getValue(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
 
 
 
 
-proc getRowTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): Row =
-  try:
-    result = getRow(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+  proc getAllRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): seq[Row] =
+    try:
+      result = getAllRows(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
 
 
 
 
-iterator fastRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): Row =
-  try:
-    for i in fastRows(db, query, args):
-      yield i
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+  proc getRowTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`], fillIfNull = 0): Row =
+    try:
+      result = getRow(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+
+    # If the fillIfNull is set, we will fill the result with empty strings in case
+    # the result count does not match the fillIfNull value
+    if fillIfNull != 0 and result.len() != fillIfNull:
+      for i in 0..fillIfNull-1:
+        result.add("")
 
 
 
 
-proc tryExecTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): bool =
-  try:
-    result = tryExec(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+  iterator fastRowsTry*(db: DbConn, query: SqlQuery, args: varargs[string, `$`]): Row =
+    try:
+      for i in fastRows(db, query, args):
+        yield i
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
 
 
 
 
-proc execTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]) =
-  try:
-    exec(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+  proc tryExecTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): bool =
+    try:
+      result = tryExec(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
 
 
 
 
-proc execAffectedRowsTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): int64 =
-  try:
-    result = execAffectedRows(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
-    return -1
+  proc execTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]) =
+    try:
+      exec(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
 
 
 
-proc tryInsertIDTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): int64 =
-  try:
-    result = tryInsertID(db, query, args)
-  except:
-    error(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
-    return -1
+
+  proc execAffectedRowsTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): int64 =
+    try:
+      result = execAffectedRows(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+      return -1
+
+
+
+  proc tryInsertIDTry*(db: DbConn, query: SqlQuery; args: varargs[string, `$`]): int64 =
+    try:
+      result = tryInsertID(db, query, args)
+    except:
+      echo(distinctBase(query).subStr(0, 200) & "\n" & getCurrentExceptionMsg())
+      return -1
