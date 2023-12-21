@@ -2,39 +2,25 @@ name: Build sqlbuilder
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '*'
   pull_request:
-    branches: [ master ]
+    branches:
+      - '*'
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macOS-latest
-        version:
-          - stable
-
+        nim:
+          - '1.6.14'
+          - 'stable'
+    name: Nim ${{ matrix.nim }} sample
     steps:
-    - uses: actions/checkout@v1
-    - uses: jiro4989/setup-nim-action@master
-      with:
-        nim-version: ${{ matrix.version }}
-
-    - name: Print Nim version
-      run: nim -v
-
-    - name: Print Nimble version
-      run: nimble -v
-
-    #- name: Nimble Refresh
-    #  run: nimble -y refresh
-
-    #- name: Nimble Install dependencies
-    #  run: nimble -y install --depsOnly
-
-    - name: Build binaries
-      run: nimble install -d:release
+      - uses: actions/checkout@v3
+      - name: Setup nim
+        uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: ${{ matrix.nim }}
+      - run: nimble test -Y

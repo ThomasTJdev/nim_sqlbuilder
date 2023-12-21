@@ -1,2 +1,15 @@
-tests/test
 src/sqlbuilder
+.vscode
+
+tests/db_general.db
+tests/mytest.db
+tests/test_string
+
+!tests/t*.nim
+tests/*/*
+!tests/*/t*.nim
+
+!tests/config.nims
+!tests/create_db.nim
+
+tests/test_string/test_dead.nim

@@ -1,20 +1,27 @@
 # Copyright 2020 - Thomas T. Jarløv
 
+when NimMajor >= 2:
+  import db_connector/db_common
+else:
+  import std/db_common
+
+import
+  std/macros
+
+import
+  ./utils_private
+
+from ./utils import ArgsContainer
+
+
 proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
   ## SQL builder for DELETE queries
   ## Does NOT check for NULL values
 
   var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
-  result = sql(res & wes)
+  if where.len > 0:
+    res.add sqlWhere(where)
+  result = sql(res)
 
 
 proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query): SqlQuery =
@@ -22,19 +29,9 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
   ## Checks for NULL values
 
   var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    if args[i].isNull:
-      wes.add(d & " = NULL")
-    else:
-      wes.add(d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
-  result = sql(res & wes)
+  if where.len > 0:
+    res.add(sqlWhere(where))
+  result = sql(res)
 
 
 macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
@@ -42,13 +39,6 @@ macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
   ## Does NOT check for NULL values
 
   var res = "DELETE FROM " & $table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add($d & " = ?")
-
-  when defined(testSqlquery):
-    echo res & wes
-
-  result = parseStmt("sql(\"" & res & wes & "\")")
+  if where.len > 0:
+    res.add sqlWhere(where)
+  result = parseStmt("sql(\"" & res & "\")")
