@@ -14,8 +14,6 @@ import
 
 from ./utils import SQLJoinType, ArgsContainer
 
-const noJoin*: tuple[table: string, tableAs: string, on: seq[string]] = ("", "", @[])
-
 
 ##
 ## Constant generator utilities
@@ -33,7 +31,7 @@ proc sqlSelectConstJoin(
   ): string =
   var lef = ""
 
-  if joinargs == [] or $(joinargs.repr) == "[]":
+  if joinargs.len == 0:
     return
 
   for d in joinargs:
@@ -235,7 +233,7 @@ macro sqlSelectConst*(
 
   # Join table
   var joinTablesUsed: seq[string]
-  if joinargs[0] != noJoin and joinargs != [] and $(joinargs.repr) != "[]":
+  if joinargs.len != 0:
     for i, d in joinargs:
       if d.repr.len == 0:
         continue
@@ -276,7 +274,7 @@ macro sqlSelectConst*(
   # Joins
   #
   var lef = ""
-  if joinargs[0] != noJoin:
+  if joinargs.len != 0:
     lef = sqlSelectConstJoin(joinargs, jointype)
 
 
@@ -407,7 +405,7 @@ proc sqlSelect*(
 
 
   # Join table
-  if joinargs.len() > 0 and joinargs[0] != noJoin:
+  if joinargs.len() > 0:
     for d in joinargs:
       if d.table == "":
         continue
@@ -440,7 +438,7 @@ proc sqlSelect*(
   # Joins
   #
   var lef = ""
-  if joinargs.len() > 0 and joinargs[0] != noJoin:
+  if joinargs.len() > 0:
     for i, d in joinargs:
       lef.add(" " & $jointype & " JOIN ")
       lef.add(d.table & " ")
@@ -600,7 +598,7 @@ proc sqlSelect*(
     # Check for missing table alias
     if (
       (tableAs != "" and table != tableAs) or
-      (joinargs.len() > 0 and joinargs[0] != noJoin)
+      (joinargs.len() > 0)
     ):
       var hit: bool
       for s in select:
