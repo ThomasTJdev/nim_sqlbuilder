@@ -247,6 +247,17 @@ suite "test sqlSelectConst - joins":
     )
     check querycompare(test, sql("SELECT id, name FROM tasks AS t INNER JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
 
+  test "CROSS JOIN":
+    var test: SqlQuery
+
+    test = sqlSelectConst(
+      table     = "a",
+      select    = ["id"],
+      where     = [],
+      joinargs  = [(table: "b", tableAs: "", on: @["a.id = b.id"])],
+      jointype  = CROSS,
+    )
+    check querycompare(test, sql("SELECT id FROM a CROSS JOIN b ON (a.id = b.id)"))
 
   test "JOIN #1":
     var test: SqlQuery
