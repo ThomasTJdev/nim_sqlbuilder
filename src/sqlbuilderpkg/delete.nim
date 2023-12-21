@@ -19,12 +19,9 @@ proc sqlDelete*(table: string, where: varargs[string]): SqlQuery =
   ## Does NOT check for NULL values
 
   var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(formatWhereParams(d))
-  result = sql(res & wes)
+  if where.len > 0:
+    res.add sqlWhere(where)
+  result = sql(res)
 
 
 proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query): SqlQuery =
@@ -32,15 +29,9 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
   ## Checks for NULL values
 
   var res = "DELETE FROM " & table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    if args[i].isNull:
-      wes.add(d & " = NULL")
-    else:
-      wes.add(d & " = ?")
-  result = sql(res & wes)
+  if where.len > 0:
+    res.add(sqlWhere(where))
+  result = sql(res)
 
 
 macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
@@ -48,9 +39,6 @@ macro sqlDeleteMacro*(table: string, where: varargs[string]): SqlQuery =
   ## Does NOT check for NULL values
 
   var res = "DELETE FROM " & $table
-  var wes = " WHERE "
-  for i, d in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(formatWhereParams($d))
-  result = parseStmt("sql(\"" & res & wes & "\")")
+  if where.len > 0:
+    res.add sqlWhere(where)
+  result = parseStmt("sql(\"" & res & "\")")
