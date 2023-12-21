@@ -10,26 +10,17 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-        version:
-          - 1.6.14
-          - stable
-
+        nim:
+          - '1.6.14'
+          - 'stable'
+    name: Nim ${{ matrix.nim }} sample
     steps:
-    - uses: actions/checkout@v1
-    - uses: jiro4989/setup-nim-action@master
-      with:
-        nim-version: ${{ matrix.version }}
-
-    - name: Print Nim version
-      run: nim -v
-
-    - name: Print Nimble version
-      run: nimble -v
-
-    - name: Build binaries
-      run: nimble test
+      - uses: actions/checkout@v3
+      - name: Setup nim
+        uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: ${{ matrix.nim }}
+      - run: nimble test -Y
