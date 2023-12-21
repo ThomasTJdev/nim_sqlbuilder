@@ -19,6 +19,7 @@ type
     INNER
     LEFT
     RIGHT
+    CROSS
     FULL
 
   SQLQueryType* = enum

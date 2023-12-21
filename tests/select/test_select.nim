@@ -191,6 +191,18 @@ suite "test sqlSelect - joins":
     )
     check querycompare(test, sql("SELECT id, name FROM tasks AS t INNER JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
 
+  test "CROSS JOIN":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "a",
+      select    = @["id"],
+      joinargs  = @[(table: "b", tableAs: "", on: @["a.id = b.id"])],
+      jointype  = CROSS,
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id FROM a CROSS JOIN b ON (a.id = b.id)"))
+
 
 
 suite "test sqlSelect - deletemarkers / softdelete":
