@@ -150,6 +150,45 @@ suite "test sqlSelect":
 
 suite "test sqlSelect - joins":
 
+  test "LEFT JOIN [no values] using empty []":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      tableAs   = "t",
+      select    = @["id", "name"],
+      where     = @["id ="],
+      joinargs  = @[],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name FROM tasks AS t WHERE id = ? "))
+
+  test "LEFT JOIN [no values] using varargs instead of seq":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      tableAs   = "t",
+      select    = ["id", "name"],
+      where     = ["id ="],
+      joinargs  = [],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name FROM tasks AS t WHERE id = ? "))
+
+  test "LEFT JOIN using AS values with varargs":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      tableAs   = "t",
+      select    = ["id", "name"],
+      where     = ["id ="],
+      joinargs  = [(table: "projects", tableAs: "p", on: @["p.id = t.project_id", "p.status = 1"])],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name FROM tasks AS t LEFT JOIN projects AS p ON (p.id = t.project_id AND p.status = 1) WHERE id = ? "))
+
   test "LEFT JOIN using AS values":
     var test: SqlQuery
 
