@@ -67,4 +67,32 @@ suite "delete - macro":
     check querycompare(test, sql("DELETE FROM my-table WHERE name IS NULL AND age = ?"))
 
 
+suite "delete - genArgs":
+
+  test "sqlDelete with genArgs":
+
+    var a = genArgs("123", dbNullVal)
+
+    var test = sqlDelete("tasksQQ", ["id =", "status IS"], a.query)
+
+    check querycompare(test, sql("""DELETE FROM tasksQQ WHERE id = ? AND status IS ?"""))
+
+
+
+    a = genArgs("123", dbNullVal, dbNullVal)
+
+    test = sqlDelete("tasksQQ", ["id =", "status IS NOT", "phase IS"], a.query)
+
+    check querycompare(test, sql("""DELETE FROM tasksQQ WHERE id = ? AND status IS NOT ? AND phase IS ?"""))
+
+
+
+  test "sqlDelete with genArgsSetNull":
+
+    var a = genArgsSetNull("123", "", "")
+
+    var test = sqlDelete("tasksQQ",  ["id =", "status IS NOT", "phase IS"],  a.query)
+
+    check querycompare(test, sql("""DELETE FROM tasksQQ WHERE id = ? AND status IS NOT ? AND phase IS ?"""))
+
 

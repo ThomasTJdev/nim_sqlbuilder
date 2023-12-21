@@ -30,14 +30,7 @@ proc sqlDelete*(table: string, where: varargs[string], args: ArgsContainer.query
 
   var res = "DELETE FROM " & table
   if where.len > 0:
-    res.add " WHERE "
-    for i, d in where:
-      if i > 0:
-        res.add(" AND ")
-      if args[i].isNull:
-        res.add(d & " = NULL")
-      else:
-        res.add(d & " = ?")
+    res.add(sqlWhere(where))
   result = sql(res)
 
 
