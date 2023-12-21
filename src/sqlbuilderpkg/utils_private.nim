@@ -7,6 +7,7 @@ else:
 
 
 import
+  std/macros,
   std/strutils
 
 
@@ -139,3 +140,34 @@ proc hasIllegalFormats*(query: string): string =
   if "??" in noSpaces:
     return "double insert detected. (??)"
 
+proc sqlWhere*(where: varargs[string]): string =
+  ## the WHERE part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `WHERE name = ?, age = ?`
+  ##
+  ## => ["name = ", "age >"]
+  ## => `WHERE name = ?, age > ?`
+  var wes = " WHERE "
+  for i, v in where:
+    if i > 0:
+      wes.add(" AND ")
+    wes.add(formatWhereParams(v))
+  return wes
+
+proc sqlWhere*(where: NimNode): string =
+  ## the WHERE part of the query.
+  ##
+  ## => ["name", "age = "]
+  ## => `WHERE name = ?, age = ?`
+  ##
+  ## => ["name = ", "age >"]
+  ## => `WHERE name = ?, age > ?`
+  var wes = " WHERE "
+  for i, v in where:
+    # Convert NimNode to string
+    let d = $v
+    if i > 0:
+      wes.add(" AND ")
+    wes.add(formatWhereParams(d))
+  return wes

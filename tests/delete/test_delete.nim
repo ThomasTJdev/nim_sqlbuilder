@@ -24,6 +24,9 @@ suite "delete - normal":
     test = sqlDelete("my-table", ["name", "age"])
     check querycompare(test, sql("DELETE FROM my-table WHERE name = ? AND age = ?"))
 
+    test = sqlDelete("my-table", [])
+    check querycompare(test, sql("DELETE FROM my-table"))
+
 
   test "sqlDeleteWhere":
     var test: SqlQuery

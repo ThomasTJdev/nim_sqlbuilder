@@ -72,22 +72,6 @@ proc updateArray(arrayType: string, arrayAppend: varargs[string]): string =
   return result
 
 
-proc updateWhere(where: varargs[string]): string =
-  ## Update the WHERE part of the query.
-  ##
-  ## => ["name", "age = "]
-  ## => `WHERE name = ?, age = ?`
-  ##
-  ## => ["name = ", "age >"]
-  ## => `WHERE name = ?, age > ?`
-  var wes = " WHERE "
-  for i, v in where:
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(formatWhereParams(v))
-  return wes
-
-
 proc sqlUpdate*(table: string, data: varargs[string], where: varargs[string], args: ArgsContainer.query): SqlQuery =
   ## SQL builder for UPDATE queries
   ## Checks for NULL values
@@ -130,7 +114,7 @@ proc sqlUpdate*(
   ## where => ["id = ", "name IS NULL"]
   var fields: string
   fields.add(updateSet(data))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = sql("UPDATE " & table & " SET " & fields)
 
 
@@ -142,7 +126,7 @@ proc sqlUpdateArrayRemove*(
   ## ARRAY_REMOVE
   var fields: string
   fields.add(updateArray("ARRAY_REMOVE", arrayRemove))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = sql("UPDATE " & table & " SET " & fields)
 
 
@@ -154,7 +138,7 @@ proc sqlUpdateArrayAppend*(
   ## ARRAY_APPEND
   var fields: string
   fields.add(updateArray("ARRAY_APPEND", arrayAppend))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = sql("UPDATE " & table & " SET " & fields)
 
 
@@ -179,26 +163,6 @@ proc updateSet(data: NimNode): string =
   return result
 
 
-
-proc updateWhere(where: NimNode): string =
-  ## Update the WHERE part of the query.
-  ##
-  ## => ["name", "age = "]
-  ## => `WHERE name = ?, age = ?`
-  ##
-  ## => ["name = ", "age >"]
-  ## => `WHERE name = ?, age > ?`
-  var wes = " WHERE "
-  for i, v in where:
-    # Convert NimNode to string
-    let d = $v
-    if i > 0:
-      wes.add(" AND ")
-    wes.add(formatWhereParams(d))
-  return wes
-
-
-
 macro sqlUpdateMacro*(
     table: string,
     data: varargs[string],
@@ -212,7 +176,7 @@ macro sqlUpdateMacro*(
   ## where => ["id = ", "name IS NULL"]
   var fields: string
   fields.add(updateSet(data))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
 
 
@@ -243,7 +207,7 @@ macro sqlUpdateMacroArrayRemove*(
   ## ARRAY_REMOVE macro
   var fields: string
   fields.add(updateArray("ARRAY_REMOVE", arrayRemove))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
 
 
@@ -255,5 +219,5 @@ macro sqlUpdateMacroArrayAppend*(
   ## ARRAY_APPEND macro
   var fields: string
   fields.add(updateArray("ARRAY_APPEND", arrayAppend))
-  fields.add(updateWhere(where))
+  fields.add(sqlWhere(where))
   result = parseStmt("sql(\"" & "UPDATE " & $table & " SET " & fields & "\")")
