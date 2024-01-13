@@ -64,21 +64,43 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
 
   for i, d in where:
     let v = $d
+    let dataUpper = v.toUpperAscii()
+    let needParenthesis = dataUpper.contains(" OR ") or dataUpper.contains(" AND ")
+
 
     if v.len() > 0 and i == 0:
       wes.add(" WHERE ")
 
+
     if i > 0:
       wes.add(" AND ")
 
+
     if v.len() > 0:
 
+      if needParenthesis:
+        wes.add("(")
+
+
+      if v.contains("?"):
+        if boolVal(usePrepared):
+          var t: string
+          for c in v:
+            if c == '?':
+              prepareCount += 1
+              t.add("$" & $prepareCount)
+            else:
+              t.add($c)
+          wes.add(t)
+        else:
+          wes.add(d)
+
       # => ... = NULL
-      if v[(v.high - 3)..v.high] == "NULL":
+      elif dataUpper[(v.high - 3)..v.high] == "NULL":
         wes.add(v)
 
       # => ? = ANY(...)
-      elif v.len() > 5 and v[0..4] == "= ANY":
+      elif v.len() > 5 and dataUpper[0..4] == "= ANY":
         if boolVal(usePrepared):
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & v)
@@ -86,7 +108,7 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add("? " & v)
 
       # => ... IN (?)
-      elif v[(v.high - 2)..v.high] == " IN":
+      elif dataUpper[(v.high - 2)..v.high] == " IN":
         if boolVal(usePrepared):
           prepareCount += 1
           wes.add(v & " ($" & $prepareCount & ")")
@@ -94,7 +116,7 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add(v & " (?)")
 
       # => ? IN (...)
-      elif v.len() > 2 and v[0..1] == "IN":
+      elif v.len() > 2 and dataUpper[0..1] == "IN":
         if boolVal(usePrepared):
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & v)
@@ -108,6 +130,11 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add(v & " $" & $prepareCount)
         else:
           wes.add(v & " ?")
+
+
+      if needParenthesis:
+        wes.add(")")
+
 
   return wes
 
@@ -473,16 +500,36 @@ proc sqlSelect*(
       wes.add(" AND ")
 
     if d != "":
+      let dataUpper = d.toUpperAscii()
+      let needParenthesis = dataUpper.contains(" OR ") or dataUpper.contains(" AND ")
+
+      if needParenthesis:
+        wes.add("(")
+
+
+      if d.contains("?"):
+        if usePrepared:
+          var t: string
+          for c in d:
+            if c == '?':
+              prepareCount += 1
+              t.add("$" & $prepareCount)
+            else:
+              t.add($c)
+          wes.add(t)
+        else:
+          wes.add(d)
+
       # => ... = NULL
-      if checkedArgs.len() > 0 and checkedArgs[i].isNull:
+      elif checkedArgs.len() > 0 and checkedArgs[i].isNull:
         wes.add(d & " NULL")
 
       # => ... = NULL
-      elif d[(d.high - 3)..d.high] == "NULL":
+      elif dataUpper[(d.high - 3)..d.high] == "NULL":
         wes.add(d)
 
       # => ? = ANY(...)
-      elif d.len() > 5 and d[0..4] == "= ANY":
+      elif d.len() > 5 and dataUpper[0..4] == "= ANY":
         if usePrepared:
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & d)
@@ -490,7 +537,7 @@ proc sqlSelect*(
           wes.add("? " & d)
 
       # => ... IN (?)
-      elif d[(d.high - 2)..d.high] == " IN":
+      elif dataUpper[(d.high - 2)..d.high] == " IN":
         if usePrepared:
           prepareCount += 1
           wes.add(d & " ($" & $prepareCount & ")")
@@ -498,7 +545,7 @@ proc sqlSelect*(
           wes.add(d & " (?)")
 
       # => ? IN (...)
-      elif d.len() > 2 and d[0..1] == "IN":
+      elif d.len() > 2 and dataUpper[0..1] == "IN":
         if usePrepared:
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & d)
@@ -512,6 +559,10 @@ proc sqlSelect*(
           wes.add(d & " $" & $prepareCount)
         else:
           wes.add(d & " ?")
+
+
+      if needParenthesis:
+        wes.add(")")
 
 
   #

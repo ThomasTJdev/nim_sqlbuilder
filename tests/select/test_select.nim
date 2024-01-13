@@ -387,5 +387,132 @@ suite "test sqlSelect - deletemarkers / softdelete":
 
 
 
+suite "test where cases custom formatting":
+
+  test "where OR":
+    var test: SqlQuery
+
+    const
+      table     = "tasks"
+      select    = ["id", "name", "description", "created", "updated", "completed"]
+      where     = ["id = ? OR id = ?"]
+
+    let
+      resNormal   = sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = ? OR id = ?) ")
+      resPrepared = sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = $1 OR id = $2) ")
+
+    # Normal
+    test = sqlSelect(
+      table     = table,
+      select    = select,
+      where     = where,
+      useDeleteMarker = false,
+      usePrepared = false
+    )
+    check querycompare(test, resNormal)
+
+
+    # Prepared
+    test = sqlSelect(
+      table     = table,
+      select    = select,
+      where     = where,
+      useDeleteMarker = false,
+      usePrepared = true
+    )
+    check querycompare(test, resPrepared)
+
+
+    # Macro normal
+    test = sqlSelectConst(
+      table     = "tasks",
+      select    = select,
+      where     = where,
+      joinargs  = [],
+      useDeleteMarker = false,
+      usePrepared = false
+    )
+    check querycompare(test, resNormal)
+
+
+    # Macro prepared
+    test = sqlSelectConst(
+      table     = "tasks",
+      select    = select,
+      where     = where,
+      joinargs  = [],
+      useDeleteMarker = false,
+      usePrepared = true
+    )
+    check querycompare(test, resPrepared)
+
+
+
+  test "where OR OR":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id = ? OR name = ? OR description = ?"],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = ? OR name = ? OR description = ?) "))
+
+
+  test "where OR OR parentheses":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id = ? OR (name = ? OR description = ?)"],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = ? OR (name = ? OR description = ?)) "))
+
+
+  test "where AND OR parentheses":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id = ? AND (name = ? OR description = ?)"],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = ? AND (name = ? OR description = ?)) "))
+
+
+  test "where OR OR parentheses AND ? = ANY(...)":
+    var test: SqlQuery
+    const
+      table     = "tasks"
+      select    = @["id", "name", "description", "created", "updated", "completed"]
+      where     = @["id = ? OR (name = ? OR description = ?) AND ? = ANY(ids_array)"]
+
+    let
+      resNormal   = sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = ? OR (name = ? OR description = ?) AND ? = ANY(ids_array)) ")
+      resPrepared = sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE (id = $1 OR (name = $2 OR description = $3) AND $4 = ANY(ids_array)) ")
+
+    test = sqlSelect(
+      table     = table,
+      select    = select,
+      where     = where,
+      useDeleteMarker = false,
+      usePrepared = false
+    )
+    check querycompare(test, resNormal)
+
+
+    test = sqlSelect(
+      table     = table,
+      select    = select,
+      where     = where,
+      useDeleteMarker = false,
+      usePrepared = true
+    )
+    check querycompare(test, resPrepared)
+
 
 
