@@ -54,6 +54,19 @@ suite "test sqlSelect":
     check querycompare(test, sql("SELECT t.id, t.name, t.description, t.created, t.updated, t.completed FROM tasks AS t WHERE t.id = ? "))
 
 
+  test "from using AS inline ":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks AS t",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id ="],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks AS t WHERE id = ? "))
+
+
+
   test "WHERE statements: general":
     var test: SqlQuery
 
@@ -208,6 +221,18 @@ suite "test sqlSelect - joins":
     test = sqlSelect(
       table     = "tasks",
       tableAs   = "t",
+      select    = @["id", "name"],
+      where     = @["id ="],
+      joinargs  = @[(table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name FROM tasks AS t LEFT JOIN projects ON (projects.id = t.project_id AND projects.status = 1) WHERE id = ? "))
+
+  test "LEFT JOIN (default) from table as inline":
+    var test: SqlQuery
+
+    test = sqlSelect(
+      table     = "tasks AS t",
       select    = @["id", "name"],
       where     = @["id ="],
       joinargs  = @[(table: "projects", tableAs: "", on: @["projects.id = t.project_id", "projects.status = 1"])],
