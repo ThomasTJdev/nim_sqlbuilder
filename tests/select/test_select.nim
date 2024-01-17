@@ -541,3 +541,39 @@ suite "test where cases custom formatting":
 
 
 
+
+
+
+suite "test using DB names for columns":
+
+  test "info => in, nonull => null, anything => any":
+
+    let test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name"],
+      where     = @["id =", "user =", "info =", "IN info", "anything =", "IN nonull"],
+    )
+    check querycompare(test, sql(" SELECT id, name FROM tasks WHERE id = ? AND user = ? AND info = ? AND ? IN info AND anything = ? AND ? IN nonull"))
+
+
+
+
+suite "catch bad formats":
+
+  test "malicious ?":
+
+    const mal = [
+      "id = ?, AND ?",
+      "id = ?, OR ?",
+      "id = ? ?",
+      "id = ? AND ?",
+      "id = ? OR ?",
+    ]
+
+    for m in mal:
+      check hasIllegalFormats(m) != ""
+
+
+
+
+

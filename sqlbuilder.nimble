@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.0.2"
+version       = "1.0.3"
 author        = "ThomasTJdev"
 description   = "SQL builder"
 license       = "MIT"

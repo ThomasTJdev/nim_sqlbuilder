@@ -254,3 +254,14 @@ suite "test sqlSelectMacro":
     check querycompare(q1, sql("SELECT name, age FROM my-table WHERE id = ?"))
 
 
+
+
+suite "test various":
+
+  test "xxx":
+
+    let q1 = sqlSelect("locker", ["name"], [""], ["project_id =", "name =", "info ="], "", "", "")
+
+    check querycompare(q1, sql("SELECT name FROM locker WHERE project_id = ? AND name = ? AND info = ?"))
+
+

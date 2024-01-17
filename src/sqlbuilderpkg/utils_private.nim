@@ -137,8 +137,44 @@ proc hasIllegalFormats*(query: string): string =
   #
   let noSpaces = query.strip().replace(" ", "")
 
-  if "??" in noSpaces:
-    return "double insert detected. (??)"
+  const nospaceBad = [
+    "??",
+    "=?,?,",
+    "=?,AND",
+    "=?,OR",
+    "AND?,",
+    "OR?,",
+  ]
+
+  for b in nospaceBad:
+    if b in noSpaces:
+      return "wrong position of ?. (" & b & ")"
+
+
+
+  #
+  # Bad ? substittution
+  #
+  const badSubstitutions = [
+    "= ? AND ?",
+    "= ? OR ?"
+  ]
+  const badSubstitutionsAccept = [
+    " = ? AND ? ANY ",
+    " = ? AND ? IN ",
+    " = ? AND ? = "
+  ]
+  for o in badSubstitutions:
+    if o in query:
+      var pass: bool
+      for b in badSubstitutionsAccept:
+        if b in query:
+          pass = true
+          break
+      if not pass:
+        return "bad ? substitution. (= ? AND ?)"
+
+
 
 proc sqlWhere*(where: varargs[string]): string =
   ## the WHERE part of the query.

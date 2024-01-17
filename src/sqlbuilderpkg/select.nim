@@ -96,7 +96,7 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add(d)
 
       # => ... = NULL
-      elif dataUpper[(v.high - 3)..v.high] == "NULL":
+      elif v.len() >= 5 and dataUpper[(v.high - 4)..v.high] == " NULL":
         wes.add(v)
 
       # => ? = ANY(...)
@@ -108,7 +108,7 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add("? " & v)
 
       # => ... IN (?)
-      elif dataUpper[(v.high - 2)..v.high] == " IN":
+      elif v.len() >= 3 and dataUpper[(v.high - 2)..v.high] == " IN":
         if boolVal(usePrepared):
           prepareCount += 1
           wes.add(v & " ($" & $prepareCount & ")")
@@ -116,7 +116,7 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add(v & " (?)")
 
       # => ? IN (...)
-      elif v.len() > 2 and dataUpper[0..1] == "IN":
+      elif v.len() > 2 and dataUpper[0..2] == "IN ":
         if boolVal(usePrepared):
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & v)
@@ -525,7 +525,7 @@ proc sqlSelect*(
         wes.add(d & " NULL")
 
       # => ... = NULL
-      elif dataUpper[(d.high - 3)..d.high] == "NULL":
+      elif d.len() >= 5 and dataUpper[(d.high - 4)..d.high] == " NULL":
         wes.add(d)
 
       # => ? = ANY(...)
@@ -537,7 +537,7 @@ proc sqlSelect*(
           wes.add("? " & d)
 
       # => ... IN (?)
-      elif dataUpper[(d.high - 2)..d.high] == " IN":
+      elif d.len() >= 3 and dataUpper[(d.high - 2)..d.high] == " IN":
         if usePrepared:
           prepareCount += 1
           wes.add(d & " ($" & $prepareCount & ")")
@@ -545,7 +545,7 @@ proc sqlSelect*(
           wes.add(d & " (?)")
 
       # => ? IN (...)
-      elif d.len() > 2 and dataUpper[0..1] == "IN":
+      elif d.len() > 2 and dataUpper[0..2] == "IN ":
         if usePrepared:
           prepareCount += 1
           wes.add("$" & $prepareCount & " " & d)
