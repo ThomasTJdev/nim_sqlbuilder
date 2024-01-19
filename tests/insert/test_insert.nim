@@ -68,6 +68,21 @@ suite "insert - default":
     check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (?, NULL)"))
 
 
+
+  test "empty value transform to NULL":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age"], @["", "30"])
+    check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (NULL, ?)"))
+
+  test "empty value transform to NULL":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age"], @["", ""])
+    check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (NULL, NULL)"))
+
+
+
 suite "insert - macro":
 
   test "sqlInsert - default":
