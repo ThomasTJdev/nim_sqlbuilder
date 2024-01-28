@@ -16,7 +16,7 @@ import
 
 
 
-suite "arrays":
+suite "update - arrays":
 
   test "[manual] update arrays - ARRAY_REMOVE":
 
@@ -37,6 +37,24 @@ suite "arrays":
     )
     check querycompare(q, sql("UPDATE table SET project_ids = ARRAY_REMOVE(project_ids, ?) WHERE id = ?"))
 
+
+
+
+suite "update - arrays where cond ANY":
+
+  test "array":
+
+    let q = sqlUpdate(
+      "table",
+      ["name"],
+      ["some_ids = ANY(?::INT[])"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ? WHERE some_ids = ANY(?::INT[])"))
+
+
+
+
+suite "update - arrays dedicated":
 
   test "[dedicated] update array - ARRAY_REMOVE":
 
