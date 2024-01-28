@@ -69,18 +69,35 @@ suite "insert - default":
 
 
 
-  test "empty value transform to NULL":
+  test "empty value transform to NULL #1":
     var test: SqlQuery
 
     test = sqlInsert("my-table", ["name", "age"], @["", "30"])
     check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (NULL, ?)"))
 
-  test "empty value transform to NULL":
+  test "empty value transform to NULL #2":
     var test: SqlQuery
 
     test = sqlInsert("my-table", ["name", "age"], @["", ""])
     check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (NULL, NULL)"))
 
+  test "empty value transform to NULL #3":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age", "company", "ident"], @["john", "23", "", "ok"])
+    check querycompare(test, sql("INSERT INTO my-table (name, age, company, ident) VALUES (?, ?, NULL, ?)"))
+
+  test "empty value transform to NULL #5":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age", "company", "ident"], @["", "", "", ""])
+    check querycompare(test, sql("INSERT INTO my-table (name, age, company, ident) VALUES (NULL, NULL, NULL, NULL)"))
+
+  test "empty value transform to NULL #4":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age", "company", "ident"], @["john", "", "", "ok"])
+    check querycompare(test, sql("INSERT INTO my-table (name, age, company, ident) VALUES (?, NULL, NULL, ?)"))
 
 
 suite "insert - macro":

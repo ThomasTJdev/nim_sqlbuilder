@@ -366,7 +366,9 @@ macro sqlSelectConst*(
 
 
 
-
+##
+## Default select generator
+##
 proc sqlSelect*(
     # BASE
     table: string,

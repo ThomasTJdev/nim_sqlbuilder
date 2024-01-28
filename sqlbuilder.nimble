@@ -28,6 +28,7 @@ task testlegacy, "Test legacy":
 
 proc runSelect() =
   exec "nim c -d:dev -r tests/select/test_select.nim"
+  exec "nim c -d:dev -r tests/select/test_select_arrays.nim"
   exec "nim c -d:dev -r tests/select/test_select_deletemarker.nim"
   exec "nim c -d:dev -r tests/select/test_select_const.nim"
   exec "nim c -d:dev -r tests/select/test_select_const_deletemarker.nim"
@@ -37,6 +38,7 @@ task testselect, "Test select statement":
 
 
 proc runInsert() =
+  exec "nim c -d:dev -r tests/insert/test_insert_db.nim"
   exec "nim c -d:dev -r tests/insert/test_insert.nim"
 
 task testinsert, "Test insert statement":
