@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.0.3"
+version       = "1.0.4"
 author        = "ThomasTJdev"
 description   = "SQL builder"
 license       = "MIT"
@@ -29,6 +29,7 @@ task testlegacy, "Test legacy":
 proc runSelect() =
   exec "nim c -d:dev -r tests/select/test_select.nim"
   exec "nim c -d:dev -r tests/select/test_select_arrays.nim"
+  exec "nim c -d:dev -r tests/select/test_select_is.nim"
   exec "nim c -d:dev -r tests/select/test_select_deletemarker.nim"
   exec "nim c -d:dev -r tests/select/test_select_const.nim"
   exec "nim c -d:dev -r tests/select/test_select_const_deletemarker.nim"

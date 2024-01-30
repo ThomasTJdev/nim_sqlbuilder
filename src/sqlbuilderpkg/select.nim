@@ -99,6 +99,12 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
       elif v.len() >= 5 and dataUpper[(v.high - 4)..v.high] == " NULL":
         wes.add(v)
 
+      elif v.len() >= 5 and dataUpper[(v.high - 4)..v.high] == " TRUE":
+        wes.add(v)
+
+      elif v.len() >= 6 and dataUpper[(v.high - 5)..v.high] == " FALSE":
+        wes.add(v)
+
       # => ? = ANY(...)
       elif v.len() > 5 and dataUpper[0..4] == "= ANY":
         if boolVal(usePrepared):
@@ -528,6 +534,12 @@ proc sqlSelect*(
 
       # => ... = NULL
       elif d.len() >= 5 and dataUpper[(d.high - 4)..d.high] == " NULL":
+        wes.add(d)
+
+      elif d.len() > 5 and dataUpper[(d.high - 4)..d.high] == " TRUE":
+        wes.add(d)
+
+      elif d.len() > 6 and dataUpper[(d.high - 5)..d.high] == " FALSE":
         wes.add(d)
 
       # => ? = ANY(...)
