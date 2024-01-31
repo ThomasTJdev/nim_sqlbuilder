@@ -99,9 +99,11 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
       elif v.len() >= 5 and dataUpper[(v.high - 4)..v.high] == " NULL":
         wes.add(v)
 
+      # => ... = TRUE
       elif v.len() >= 5 and dataUpper[(v.high - 4)..v.high] == " TRUE":
         wes.add(v)
 
+      # => ... = FALSE
       elif v.len() >= 6 and dataUpper[(v.high - 5)..v.high] == " FALSE":
         wes.add(v)
 
@@ -128,6 +130,24 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add("$" & $prepareCount & " " & v)
         else:
           wes.add("? " & v)
+
+      # => x = y
+      elif v.len() >= 5 and v.contains(" = "):
+        let eSplit = v.split(" = ")
+        # Value included already
+        if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
+          if boolVal(usePrepared):
+            prepareCount += 1
+            wes.add(v)
+          else:
+            wes.add(v)
+        # Insert ?
+        else:
+          if boolVal(usePrepared):
+            prepareCount += 1
+            wes.add(v & " $" & $prepareCount)
+          else:
+            wes.add(v & " ?")
 
       # => ... = ?
       else:
@@ -514,7 +534,7 @@ proc sqlSelect*(
       if needParenthesis:
         wes.add("(")
 
-
+      # Parameter substitutions included
       if d.contains("?"):
         if usePrepared:
           var t: string
@@ -536,9 +556,11 @@ proc sqlSelect*(
       elif d.len() >= 5 and dataUpper[(d.high - 4)..d.high] == " NULL":
         wes.add(d)
 
+      # => ... = TRUE
       elif d.len() > 5 and dataUpper[(d.high - 4)..d.high] == " TRUE":
         wes.add(d)
 
+      # => ... = FALSE
       elif d.len() > 6 and dataUpper[(d.high - 5)..d.high] == " FALSE":
         wes.add(d)
 
@@ -565,6 +587,24 @@ proc sqlSelect*(
           wes.add("$" & $prepareCount & " " & d)
         else:
           wes.add("? " & d)
+
+      # => x = y
+      elif d.len() >= 5 and d.contains(" = "):
+        let eSplit = d.split(" = ")
+        # Value included already
+        if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
+          if usePrepared:
+            prepareCount += 1
+            wes.add(d)
+          else:
+            wes.add(d)
+        # Insert ?
+        else:
+          if usePrepared:
+            prepareCount += 1
+            wes.add(d & " $" & $prepareCount)
+          else:
+            wes.add(d & " ?")
 
       # => ... = ?
       else:

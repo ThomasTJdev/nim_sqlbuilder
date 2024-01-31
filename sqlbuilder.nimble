@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.0.4"
+version       = "1.0.5"
 author        = "ThomasTJdev"
 description   = "SQL builder"
 license       = "MIT"
@@ -33,6 +33,7 @@ proc runSelect() =
   exec "nim c -d:dev -r tests/select/test_select_deletemarker.nim"
   exec "nim c -d:dev -r tests/select/test_select_const.nim"
   exec "nim c -d:dev -r tests/select/test_select_const_deletemarker.nim"
+  exec "nim c -d:dev -r tests/select/test_select_const_where.nim"
 
 task testselect, "Test select statement":
   runSelect()

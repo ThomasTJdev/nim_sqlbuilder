@@ -177,7 +177,6 @@ suite "test sqlSelectConst":
 
 
 
-
 suite "test sqlSelectConst - joins":
 
   test "LEFT JOIN using AS values":
@@ -690,3 +689,4 @@ suite "sqlSelectConst":
       tablesWithDeleteMarker = ["tasksQ", "history", "tasksitems"], #tableWithDeleteMarker
     )
     check querycompare(f, sql("SELECT t.id, t.name FROM tasks AS t WHERE t.id = ? AND t.id in (0)"))
+

@@ -472,7 +472,6 @@ suite "test where cases custom formatting":
     check querycompare(test, resPrepared)
 
 
-
   test "where OR OR":
     var test: SqlQuery
 
@@ -540,6 +539,84 @@ suite "test where cases custom formatting":
     check querycompare(test, resPrepared)
 
 
+  test "where x = 'y'":
+
+    let test = sqlSelect(
+      table   = "history",
+      tableAs = "h",
+      select  = [
+        "h.uuid",
+        "h.text",
+        "h.creation",
+        "person.name"
+      ],
+      where = [
+        "h.project_id =",
+        "h.item_id =",
+        "h.element = 'tasks'",
+      ],
+      joinargs = [
+        (table: "person", tableAs: "person", on: @["person.id = h.user_id"]),
+      ],
+      customSQL = "ORDER BY h.creation DESC",
+    )
+
+    check querycompare(test, sql("SELECT h.uuid, h.text, h.creation, person.name FROM history AS h LEFT JOIN person ON (person.id = h.user_id) WHERE h.project_id = ? AND h.item_id = ? AND h.element = 'tasks' ORDER BY h.creation DESC"))
+
+
+  test "where x = 'y' and x = 'y' and x = ::int":
+
+    let test = sqlSelect(
+      table   = "history",
+      tableAs = "h",
+      select  = [
+        "h.uuid",
+        "h.text",
+        "h.creation",
+        "person.name"
+      ],
+      where = [
+        "h.project_id =",
+        "h.item_id = 33",
+        "h.element = 'tasks'",
+        "h.data = 'special'",
+        "h.ident = 99",
+      ],
+      joinargs = [
+        (table: "person", tableAs: "person", on: @["person.id = h.user_id"]),
+      ],
+      customSQL = "ORDER BY h.creation DESC",
+    )
+
+    check querycompare(test, sql("SELECT h.uuid, h.text, h.creation, person.name FROM history AS h LEFT JOIN person ON (person.id = h.user_id) WHERE h.project_id = ? AND h.item_id = 33 AND h.element = 'tasks' AND h.data = 'special' AND h.ident = 99 ORDER BY h.creation DESC"))
+
+
+
+  test "where x = 'y' and x = 'y' and x = ::int with fake spaces":
+
+    let test = sqlSelect(
+      table   = "history",
+      tableAs = "h",
+      select  = [
+        "h.uuid",
+        "h.text",
+        "h.creation",
+        "person.name"
+      ],
+      where = [
+        "h.project_id = ",
+        "h.item_id =  ",
+        "h.data   =     ",
+        "h.ident   =   33   ",
+      ],
+      joinargs = [
+        (table: "person", tableAs: "person", on: @["person.id = h.user_id"]),
+      ],
+      customSQL = "ORDER BY h.creation DESC",
+    )
+
+    check querycompare(test, sql("SELECT h.uuid, h.text, h.creation, person.name FROM history AS h LEFT JOIN person ON (person.id = h.user_id) WHERE h.project_id =  ? AND h.item_id =   ? AND h.data   =      ? AND h.ident   =   33    ORDER BY h.creation DESC"))
+
 
 
 
@@ -572,12 +649,6 @@ suite "catch bad formats":
 
     for m in mal:
       check hasIllegalFormats(m) != ""
-
-
-
-
-
-
 
 
 
