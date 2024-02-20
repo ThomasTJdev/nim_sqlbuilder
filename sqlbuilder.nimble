@@ -83,6 +83,14 @@ task testargs, "Test args":
   runArgs()
 
 
+proc runImport() =
+  exec "nim c -d:dev -r tests/importpackage/test_import1.nim"
+  exec "nim c -d:dev -r tests/importpackage/test_import2.nim"
+
+task testimport, "Test import":
+  runImport()
+
+
 task test, "Test":
   runLegacy()
   runSelect()
@@ -92,3 +100,4 @@ task test, "Test":
   runQueryCalls()
   runToTypes()
   runArgs()
+  runImport()
