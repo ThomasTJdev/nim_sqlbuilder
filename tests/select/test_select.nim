@@ -619,6 +619,54 @@ suite "test where cases custom formatting":
 
 
 
+  test "where - complex where item - with parenthesis around":
+
+    let test = sqlSelect(
+      table = "history",
+      tableAs = "history",
+      select = [
+        "person.name as user_id",
+        "history.creation"
+      ],
+      where = [
+        "history.project_id =",
+        "history.item_id =",
+        "history.is_deleted IS NULL",
+        "(history.choice = 'Comment' OR history.choice = 'Picture' OR history.choice = 'File' OR history.choice = 'Design' OR history.choice = 'Update' OR history.choice = 'Create')"
+      ],
+      joinargs = [
+        (table: "person", tableAs: "", on: @["history.user_id = person.id"])
+      ],
+      customSQL = "ORDER BY history.creation DESC, history.id DESC"
+    )
+
+    check querycompare(test, sql("SELECT person.name as user_id, history.creation FROM history LEFT JOIN person ON (history.user_id = person.id) WHERE history.project_id = ? AND history.item_id = ? AND history.is_deleted IS NULL AND (history.choice = 'Comment' OR history.choice = 'Picture' OR history.choice = 'File' OR history.choice = 'Design' OR history.choice = 'Update' OR history.choice = 'Create') ORDER BY history.creation DESC, history.id DESC"))
+
+
+
+  test "where - complex where item - without parenthesis around":
+
+    let test = sqlSelect(
+      table = "history",
+      tableAs = "history",
+      select = [
+        "person.name as user_id",
+        "history.creation"
+      ],
+      where = [
+        "history.project_id =",
+        "history.item_id =",
+        "history.is_deleted IS NULL",
+        "history.choice = 'Comment' OR history.choice = 'Picture' OR history.choice = 'File' OR history.choice = 'Design' OR history.choice = 'Update' OR history.choice = 'Create'"
+      ],
+      joinargs = [
+        (table: "person", tableAs: "", on: @["history.user_id = person.id"])
+      ],
+      customSQL = "ORDER BY history.creation DESC, history.id DESC"
+    )
+
+    check querycompare(test, sql("SELECT person.name as user_id, history.creation FROM history LEFT JOIN person ON (history.user_id = person.id) WHERE history.project_id = ? AND history.item_id = ? AND history.is_deleted IS NULL AND (history.choice = 'Comment' OR history.choice = 'Picture' OR history.choice = 'File' OR history.choice = 'Design' OR history.choice = 'Update' OR history.choice = 'Create') ORDER BY history.creation DESC, history.id DESC"))
+
 
 
 suite "test using DB names for columns":

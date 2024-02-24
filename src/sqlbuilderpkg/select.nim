@@ -77,6 +77,15 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
 
 
     if v.len() > 0:
+      #
+      # If this is self-contained where with parenthesis in front and back
+      # add it and continue
+      #
+      # => (xx = yy AND zz = qq)
+      if v[0] == '(' and v[v.high] == ')':
+        wes.add(v)
+        continue
+
 
       if needParenthesis:
         wes.add("(")
@@ -137,7 +146,12 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
         # Value included already
         if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
           if boolVal(usePrepared):
-            prepareCount += 1
+            wes.add(v)
+          else:
+            wes.add(v)
+        # If there's multiple elements
+        elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
+          if boolVal(usePrepared):
             wes.add(v)
           else:
             wes.add(v)
@@ -528,6 +542,15 @@ proc sqlSelect*(
       wes.add(" AND ")
 
     if d != "":
+      #
+      # If this is self-contained where with parenthesis in front and back
+      # add it and continue
+      #
+      # => (xx = yy AND zz = qq)
+      if d[0] == '(' and d[d.high] == ')':
+        wes.add(d)
+        continue
+
       let dataUpper = d.toUpperAscii()
       let needParenthesis = dataUpper.contains(" OR ") or dataUpper.contains(" AND ")
 
@@ -594,7 +617,12 @@ proc sqlSelect*(
         # Value included already
         if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
           if usePrepared:
-            prepareCount += 1
+            wes.add(d)
+          else:
+            wes.add(d)
+        # If there's multiple elements
+        elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
+          if usePrepared:
             wes.add(d)
           else:
             wes.add(d)
