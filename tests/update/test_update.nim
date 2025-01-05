@@ -124,6 +124,37 @@ suite "update - queries":
 
 
 
+
+suite "update - queries with specified NULL in data and ? in where":
+
+  test "set NULL and where = ?":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age", "info = NULL"],
+      ["id = ?"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info = NULL WHERE id = ?"))
+
+
+  test "set NULL and where=?":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age", "info = NULL"],
+      ["id=?"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info = NULL WHERE id=?"))
+
+  test "set =NULL and where=?":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age", "info=NULL"],
+      ["id=?"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ?, info=NULL WHERE id=?"))
+
+
+
+
 suite "update macro":
 
   test "update value":

@@ -176,6 +176,55 @@ suite "test sqlSelectConst":
     check string(test).count("?") == 2
 
 
+  test "SELECT with SUM and COUNT":
+    var test: SqlQuery
+
+    test = sqlSelectConst(
+        table   = "checklist_table",
+        tableAs = "cht",
+        select  = [
+          "cht.c_id",
+          "SUM(CASE WHEN cht.status IS NULL THEN 1 ELSE 0 END) as null",
+          "SUM(CASE WHEN cht.status = 0 THEN 1 ELSE 0 END) as zero",
+          "SUM(CASE WHEN cht.status = 1 THEN 1 ELSE 0 END) as one",
+          "SUM(CASE WHEN cht.status = 2 THEN 1 ELSE 0 END) as two",
+          "COUNT(cht.id) as total",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS TRUE THEN 1 ELSE 0 END) as extraApproved",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS False THEN 1 ELSE 0 END) as extraFailed",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS NULL AND cht.status = 1 THEN 1 ELSE 0 END) as extraAwaiting",
+        ],
+        where   = [
+          "cht.project_id =",
+          "cht.type ="
+        ],
+        joinargs = [
+          (table: "checklist", tableAs: "c", on: @["c.id = cht.c_id"])
+        ],
+        customSQL = "GROUP BY cht.c_id"
+      )
+    check querycompare(test, sql("""
+select
+	cht.c_id,
+	SUM(case when cht.status is null then 1 else 0 end) as null,
+	SUM(case when cht.status = 0 then 1 else 0 end) as zero,
+	SUM(case when cht.status = 1 then 1 else 0 end) as one,
+	SUM(case when cht.status = 2 then 1 else 0 end) as two,
+	COUNT(cht.id) as total,
+	SUM(case when cht.extra_check is true and cht.extra_approve is true then 1 else 0 end) as extraApproved,
+	SUM(case when cht.extra_check is true and cht.extra_approve is false then 1 else 0 end) as extraFailed,
+	SUM(case when cht.extra_check is true and cht.extra_approve is null and cht.status = 1 then 1 else 0 end) as extraAwaiting
+from
+	checklist_table as cht
+left join checklist as c on
+	(c.id = cht.c_id)
+where
+	cht.project_id = ?
+	and cht.type = ?
+group by
+	cht.c_id
+    """))
+
+
 
 suite "test sqlSelectConst - joins":
 
@@ -426,7 +475,7 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
       joinargs  = [(table: "history", tableAs: "", on: @["history.id = tasks.hid"])],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"]
     )
-    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid) WHERE id = ? AND tasks.is_deleted IS NULL AND history.is_deleted IS NULL "))
+    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid AND history.is_deleted IS NULL) WHERE id = ? AND tasks.is_deleted IS NULL "))
 
 
 
@@ -437,7 +486,7 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
       joinargs  = [(table: "history", tableAs: "his", on: @["his.id = tasks.hid"])],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"]
     )
-    check querycompare(test, sql("SELECT tasks.id, tasks.name FROM tasks LEFT JOIN history AS his ON (his.id = tasks.hid) WHERE tasks.id = ? AND tasks.is_deleted IS NULL AND his.is_deleted IS NULL "))
+    check querycompare(test, sql("SELECT tasks.id, tasks.name FROM tasks LEFT JOIN history AS his ON (his.id = tasks.hid AND his.is_deleted IS NULL) WHERE tasks.id = ? AND tasks.is_deleted IS NULL "))
 
 
 
@@ -466,7 +515,7 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"],
       deleteMarker = ".deleted_at = 543234563"
     )
-    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid) WHERE id = ? AND tasks.deleted_at = 543234563 AND history.deleted_at = 543234563 "))
+    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid AND history.deleted_at = 543234563) WHERE id = ? AND tasks.deleted_at = 543234563 "))
 
 
 
@@ -523,7 +572,7 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
         FROM
           tasksitems AS tasks
         LEFT JOIN history AS his ON
-          (his.id = tasks.hid AND his.status = 1)
+          (his.id = tasks.hid AND his.status = 1 AND his.is_deleted IS NULL)
         LEFT JOIN projects ON
           (projects.id = tasks.project_id AND projects.status = 1)
         LEFT JOIN person ON
@@ -533,7 +582,6 @@ suite "test sqlSelectConst - deletemarkers / softdelete":
           AND tasks.status > ?
           AND tasks.id in (1,2,3)
           AND tasks.is_deleted IS NULL
-          AND his.is_deleted IS NULL
         ORDER BY
           tasks.created DESC
       """)))
@@ -585,14 +633,13 @@ suite "sqlSelectConst":
         FROM
           tasks
         LEFT JOIN history AS his ON
-          (his.id = tasks.hid AND his.status = 1)
+          (his.id = tasks.hid AND his.status = 1 AND his.is_deleted IS NULL)
         LEFT JOIN projects ON
           (projects.id = tasks.project_id AND projects.status = 1)
         WHERE
               id = ?
           AND status > ?
           AND tasks.is_deleted IS NULL
-          AND his.is_deleted IS NULL
         """))
 
 
@@ -601,7 +648,7 @@ suite "sqlSelectConst":
       select    = ["tasks.id"],
       where     = ["status >"],
       joinargs  = [
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
+          (table: "history", tableAs: "", on: @["history.id = tasks.hid"]),
         ],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"]
     )
@@ -611,11 +658,10 @@ suite "sqlSelectConst":
         FROM
           tasks
         LEFT JOIN history ON
-          (his.id = tasks.hid)
+          (history.id = tasks.hid AND history.is_deleted IS NULL)
         WHERE
               status > ?
           AND tasks.is_deleted IS NULL
-          AND history.is_deleted IS NULL
         """))
 
 
@@ -625,11 +671,11 @@ suite "sqlSelectConst":
       select    = ["tasks.id"],
       where     = ["status >"],
       joinargs  = [
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
-          (table: "history", tableAs: "", on: @["his.id = tasks.hid"]),
+          (table: "history", tableAs: "his", on: @["his.id = tasks.hid"]),
+          # (table: "history", tableAs: "his", on: @["his.id = tasks.hid"]),
+          # (table: "history", tableAs: "his", on: @["his.id = tasks.hid"]),
+          # (table: "history", tableAs: "his", on: @["his.id = tasks.hid"]),
+          # (table: "history", tableAs: "his", on: @["his.id = tasks.hid"]),
         ],
       tablesWithDeleteMarker = ["tasks", "history", "tasksitems"]
     )
@@ -638,22 +684,20 @@ suite "sqlSelectConst":
           tasks.id
         FROM
           tasks
-        LEFT JOIN history ON
-          (his.id = tasks.hid)
-        LEFT JOIN history ON
-          (his.id = tasks.hid)
-        LEFT JOIN history ON
-          (his.id = tasks.hid)
-        LEFT JOIN history ON
-          (his.id = tasks.hid)
-        LEFT JOIN history ON
-          (his.id = tasks.hid)
+        LEFT JOIN history AS his ON
+          (his.id = tasks.hid AND his.is_deleted IS NULL)
         WHERE
               status > ?
           AND tasks.is_deleted IS NULL
-          AND history.is_deleted IS NULL
         """))
-
+        # LEFT JOIN history AS his ON
+        #   (his.id = tasks.hid AND his.is_deleted IS NULL)
+        # LEFT JOIN history AS his ON
+        #   (his.id = tasks.hid AND his.is_deleted IS NULL)
+        # LEFT JOIN history AS his ON
+        #   (his.id = tasks.hid AND his.is_deleted IS NULL)
+        # LEFT JOIN history AS his ON
+        #   (his.id = tasks.hid AND his.is_deleted IS NULL)
 
   test "where in values (preformatted)":
     let e = sqlSelectConst(

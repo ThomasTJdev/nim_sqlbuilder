@@ -190,7 +190,7 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
         FROM
           tasksitems AS tasks
         LEFT JOIN history AS his ON
-          (his.id = tasks.hid AND his.status = 1)
+          (his.id = tasks.hid AND his.status = 1 AND his.is_deleted IS NULL)
         LEFT JOIN projects ON
           (projects.id = tasks.project_id AND projects.status = 1)
         LEFT JOIN person ON
@@ -200,7 +200,6 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
           AND tasks.status > ?
           AND tasks.id in (1,2,3)
           AND tasks.is_deleted IS NULL
-          AND his.is_deleted IS NULL
         ORDER BY
           tasks.created DESC
       """)))

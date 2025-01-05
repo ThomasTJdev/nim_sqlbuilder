@@ -30,7 +30,7 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
 
   test "existing delete in left join (double) - delete marker from left join":
 
-    let test = sqlSelect("tasks AS t", ["t.id", "t.name", "p.id"], ["invoice AS p ON p.id = t.invoice_id", "persons ON persons.id = tasks.person_id AND persons.is_deleted IS NULL"], ["t.id ="], "2,4,6,7", "p.id", "ORDER BY t.name")
+    let test = sqlSelect("tasks AS t", ["t.id", "t.name", "p.id"], ["invoice AS p ON p.id = t.invoice_id", "persons ON persons.id = tasks.person_id"], ["t.id ="], "2,4,6,7", "p.id", "ORDER BY t.name")
 
     check querycompare(test, sql("""
         SELECT
@@ -47,7 +47,6 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
               t.id = ?
           AND p.id in (2,4,6,7)
           AND t.is_deleted IS NULL
-          AND persons.is_deleted IS NULL
         ORDER BY
           t.name
       """))
@@ -67,12 +66,11 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
         LEFT JOIN invoice AS p ON
           (p.id = t.invoice_id)
         LEFT JOIN persons ON
-          (persons.id = tasks.person_id)
+          (persons.id = tasks.person_id AND persons.is_deleted IS NULL)
         WHERE
               t.id = ?
           AND p.id in (2,4,6,7)
           AND t.is_deleted IS NULL
-          AND persons.is_deleted IS NULL
         ORDER BY
           t.name
       """))
@@ -90,12 +88,11 @@ suite "legacy - sqlSelect(converter) - with new functionality to avoid regressio
         FROM
           tasks
         LEFT JOIN persons ON
-          (persons.id = t.persons_id)
+          (persons.id = t.persons_id AND persons.is_deleted IS NULL)
         WHERE
               t.id = ?
           AND invoice.id in (2,4,6,7)
           AND tasks.is_deleted IS NULL
-          AND persons.is_deleted IS NULL
         ORDER BY
           t.name
       """))

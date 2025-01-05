@@ -160,6 +160,54 @@ suite "test sqlSelect":
     check string(test).count("?") == 2
 
 
+  test "SELECT with SUM and COUNT":
+    var test: SqlQuery
+
+    test = sqlSelect(
+        table   = "checklist_table",
+        tableAs = "cht",
+        select  = [
+          "cht.c_id",
+          "SUM(CASE WHEN cht.status IS NULL THEN 1 ELSE 0 END) as null",
+          "SUM(CASE WHEN cht.status = 0 THEN 1 ELSE 0 END) as zero",
+          "SUM(CASE WHEN cht.status = 1 THEN 1 ELSE 0 END) as one",
+          "SUM(CASE WHEN cht.status = 2 THEN 1 ELSE 0 END) as two",
+          "COUNT(cht.id) as total",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS TRUE THEN 1 ELSE 0 END) as extraApproved",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS False THEN 1 ELSE 0 END) as extraFailed",
+          "SUM(CASE WHEN cht.extra_check IS TRUE AND cht.extra_approve IS NULL AND cht.status = 1 THEN 1 ELSE 0 END) as extraAwaiting",
+        ],
+        where   = [
+          "cht.project_id =",
+          "cht.type ="
+        ],
+        joinargs = [
+          (table: "checklist", tableAs: "c", on: @["c.id = cht.c_id"])
+        ],
+        customSQL = "GROUP BY cht.c_id"
+      )
+    check querycompare(test, sql("""
+select
+	cht.c_id,
+	SUM(case when cht.status is null then 1 else 0 end) as null,
+	SUM(case when cht.status = 0 then 1 else 0 end) as zero,
+	SUM(case when cht.status = 1 then 1 else 0 end) as one,
+	SUM(case when cht.status = 2 then 1 else 0 end) as two,
+	COUNT(cht.id) as total,
+	SUM(case when cht.extra_check is true and cht.extra_approve is true then 1 else 0 end) as extraApproved,
+	SUM(case when cht.extra_check is true and cht.extra_approve is false then 1 else 0 end) as extraFailed,
+	SUM(case when cht.extra_check is true and cht.extra_approve is null and cht.status = 1 then 1 else 0 end) as extraAwaiting
+from
+	checklist_table as cht
+left join checklist as c on
+	(c.id = cht.c_id)
+where
+	cht.project_id = ?
+	and cht.type = ?
+group by
+	cht.c_id
+    """))
+
 
 suite "test sqlSelect - joins":
 
@@ -287,6 +335,10 @@ suite "test sqlSelect - deletemarkers / softdelete":
 
 
 
+  test "deletemarkers from seq - using full name for deletemarker table in LEFT JOIN":
+    var test: SqlQuery
+    let tableWithDeleteMarkerLet = @["tasks", "history", "tasksitems"]
+
     test = sqlSelect(
       table     = "tasks",
       select    = @["id", "name"],
@@ -294,9 +346,12 @@ suite "test sqlSelect - deletemarkers / softdelete":
       joinargs  = @[(table: "history", tableAs: "", on: @["history.id = tasks.hid"])],
       tablesWithDeleteMarker = tableWithDeleteMarkerLet
     )
-    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid) WHERE id = ? AND tasks.is_deleted IS NULL AND history.is_deleted IS NULL "))
+    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid AND history.is_deleted IS NULL) WHERE id = ? AND tasks.is_deleted IS NULL "))
 
 
+  test "deletemarkers from seq - using ALIAS for deletemarker table in LEFT JOIN":
+    var test: SqlQuery
+    let tableWithDeleteMarkerLet = @["tasks", "history", "tasksitems"]
 
     test = sqlSelect(
       table     = "tasks",
@@ -305,7 +360,7 @@ suite "test sqlSelect - deletemarkers / softdelete":
       joinargs  = @[(table: "history", tableAs: "his", on: @["his.id = tasks.hid"])],
       tablesWithDeleteMarker = tableWithDeleteMarkerLet
     )
-    check querycompare(test, sql("SELECT tasks.id, tasks.name FROM tasks LEFT JOIN history AS his ON (his.id = tasks.hid) WHERE tasks.id = ? AND tasks.is_deleted IS NULL AND his.is_deleted IS NULL "))
+    check querycompare(test, sql("SELECT tasks.id, tasks.name FROM tasks LEFT JOIN history AS his ON (his.id = tasks.hid AND his.is_deleted IS NULL) WHERE tasks.id = ? AND tasks.is_deleted IS NULL "))
 
 
 
@@ -335,7 +390,7 @@ suite "test sqlSelect - deletemarkers / softdelete":
       tablesWithDeleteMarker = tableWithDeleteMarkerLet,
       deleteMarker = ".deleted_at = 543234563"
     )
-    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid) WHERE id = ? AND tasks.deleted_at = 543234563 AND history.deleted_at = 543234563 "))
+    check querycompare(test, sql("SELECT id, name FROM tasks LEFT JOIN history ON (history.id = tasks.hid AND history.deleted_at = 543234563) WHERE id = ? AND tasks.deleted_at = 543234563 "))
 
 
 
@@ -395,7 +450,7 @@ suite "test sqlSelect - deletemarkers / softdelete":
         FROM
           tasksitems AS tasks
         LEFT JOIN history AS his ON
-          (his.id = tasks.hid AND his.status = 1)
+          (his.id = tasks.hid AND his.status = 1 AND his.is_deleted IS NULL)
         LEFT JOIN projects ON
           (projects.id = tasks.project_id AND projects.status = 1)
         LEFT JOIN person ON
@@ -405,7 +460,6 @@ suite "test sqlSelect - deletemarkers / softdelete":
           AND tasks.status > ?
           AND tasks.id in (1,2,3)
           AND tasks.is_deleted IS NULL
-          AND his.is_deleted IS NULL
         ORDER BY
           tasks.created DESC
       """)))
@@ -669,6 +723,29 @@ suite "test where cases custom formatting":
 
 
 
+  test "where - using !=":
+
+    let test = sqlSelect(
+      table = "history",
+      tableAs = "history",
+      select = [
+        "person.name as user_id",
+        "history.creation"
+      ],
+      where = [
+        "history.project_id =",
+        "history.creation != history.updated",
+      ],
+      joinargs = [
+        (table: "person", tableAs: "", on: @["history.user_id = person.id"])
+      ],
+      customSQL = "ORDER BY history.creation DESC, history.id DESC"
+    )
+
+    check querycompare(test, sql("SELECT person.name as user_id, history.creation FROM history LEFT JOIN person ON (history.user_id = person.id) WHERE history.project_id = ? AND history.creation != history.updated ORDER BY history.creation DESC, history.id DESC"))
+
+
+
 suite "test using DB names for columns":
 
   test "info => in, nonull => null, anything => any":
@@ -702,3 +779,57 @@ suite "catch bad formats":
 
 
 
+  test "kkk":
+    let a = sqlSelect(
+      table     = "project",
+      tableAs   = "p",
+      select    = @[
+        "p.id",                 # 0
+        "pfl.folder_id",        # 1
+        "array_to_string(pfa.see, ',') AS pfaSee",
+        "array_to_string(pfa.write, ',') AS pfaWrite",
+        "p.name",               # 4
+        "p.author_id",          # 5
+        "pfa.folder_name",      # 6
+        "array_to_string(pfa.see_userIDs, ',')",    # 7
+        "array_to_string(pfa.write_userIDs, ',')",  # 8
+        "array_to_string(pugSee.userIDs, ',')",     # 9
+        "array_to_string(pugWrite.userIDs, ',')",   # 10
+        "array_to_string(p.priv_admin, ',')",       # 11
+        "array_to_string(p.priv_manager, ',')",     # 12
+        "array_to_string(p.priv_work, ',')",        # 13
+        "array_to_string(p.priv_designer, ',')",    # 14
+        "array_to_string(p.priv_contractor, ',')",  # 15
+        "array_to_string(p.priv_see, ',')"          # 16
+      ],
+      joinargs = @[
+        (table: "project_files_log",    tableAs: "pfl",       on: @["pfl.project_id = p.id"]),
+        (table: "project_files_access", tableAs: "pfa",       on: @["pfa.project_id = p.id", "pfa.key = pfl.folder_id"]),
+        (table: "project_users_groups", tableAs: "pugSee",    on: @["pugSee.project_id = p.id", "pugSee.id = ANY(pfa.see_groupIDs)"]),
+        (table: "project_users_groups", tableAs: "pugWrite",  on: @["pugWrite.project_id = p.id", "pugWrite.id = ANY(pfa.write_groupIDs)"])
+      ],
+      where     = @[
+        "pfl.creation >",
+        "pfl.action IN (2, 3, 4, 5)",
+        "p.usetender IS NULL"           # !! => Decides if tender
+      ],
+      customSQL = """
+        GROUP BY
+          p.id,
+          pfl.folder_id,
+          pfa.see,
+          pfa.WRITE,
+          p.name,
+          p.author_id,
+          p.priv_admin,
+          p.priv_manager,
+          pfa.folder_name,
+          pfa.see_userIDs,
+          pfa.write_userIDs,
+          pugSee.userIDs,
+          pugWrite.userIDs
+        ORDER BY
+          p.name ASC
+      """
+      )
+    echo string(a)

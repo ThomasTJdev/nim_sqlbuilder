@@ -15,9 +15,9 @@ proc querycompare*(a, b: SqlQuery): bool =
   var
     a1: seq[string]
     b1: seq[string]
-  for c in splitWhitespace(string(a)):
+  for c in splitWhitespace(string(a).toLowerAscii()):
     a1.add($c)
-  for c in splitWhitespace(string(b)):
+  for c in splitWhitespace(string(b).toLowerAscii()):
     b1.add($c)
 
   if a1 != b1:

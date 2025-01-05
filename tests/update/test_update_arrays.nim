@@ -38,6 +38,20 @@ suite "update - arrays":
     check querycompare(q, sql("UPDATE table SET project_ids = ARRAY_REMOVE(project_ids, ?) WHERE id = ?"))
 
 
+  test "update array with array_cat":
+    let q = sqlUpdate(
+      table = "projects",
+      data  = [
+        "sorting = ARRAY_CAT(sorting, ?::int[])"
+      ],
+      where = [
+        "id = ANY(?::int[])"
+      ]
+    )
+
+    check querycompare(q, sql("UPDATE projects SET sorting = ARRAY_CAT(sorting, ?::int[]) WHERE id = ANY(?::int[])"))
+
+
 
 
 suite "update - arrays where cond ANY":

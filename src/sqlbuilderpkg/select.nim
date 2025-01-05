@@ -15,6 +15,13 @@ import
 from ./utils import SQLJoinType, ArgsContainer
 
 
+# when defined(sqlDeletemarker):
+#   const sqlDeletemarkerSeq {.strdefine}: string = "sqlDeletemarkerSeq"
+#   const tablesWithDeleteMarkerInit = sqlDeletemarkerSeq.split(",")
+# else:
+#   const tablesWithDeleteMarkerInit = [""]
+
+
 ##
 ## Constant generator utilities
 ##
@@ -27,7 +34,9 @@ proc sqlSelectConstSelect(select: varargs[string]): string =
 
 proc sqlSelectConstJoin(
     joinargs: varargs[tuple[table: string, tableAs: string, on: seq[string]]],
-    jointype: NimNode
+    jointype: NimNode,
+    deleteMarkersFields: seq[string],
+    deleteMarker: NimNode
   ): string =
   var lef = ""
 
@@ -50,6 +59,12 @@ proc sqlSelectConstJoin(
       if i > 0:
         lef.add(" AND ")
       lef.add($join)
+
+    if d.table in deleteMarkersFields:
+      if d.tableAs != "" and (d.tableAs & $deleteMarker) notin lef:
+        lef.add(" AND " & d.tableAs & $deleteMarker)
+      elif (d.table & $deleteMarker) notin lef:
+        lef.add(" AND " & d.table & $deleteMarker)
 
     lef.add(")")
 
@@ -207,7 +222,8 @@ proc sqlSelectConstWhereIn(
 
 proc sqlSelectConstSoft(
     wes, acc: string,
-    tablesInQuery: seq[tuple[table: string, tableAs: string]],
+    # tablesInQuery: seq[tuple[table: string, tableAs: string]],
+    table, tableAs: string,
     tablesWithDeleteMarker: varargs[string],
     useDeleteMarker: NimNode,
     deleteMarker: NimNode
@@ -215,20 +231,20 @@ proc sqlSelectConstSoft(
   if $useDeleteMarker == "true" and tablesWithDeleteMarker.len() > 0:
     var wesTo, accTo: string
 
-    for t in tablesInQuery:
-      if t.table notin tablesWithDeleteMarker:
-        continue
+    # for t in tablesInQuery:
+    if table notin tablesWithDeleteMarker:
+      return (wesTo, accTo)
 
-      let toUse = if t.tableAs != "": t.tableAs else: t.table
+    let toUse = if tableAs != "": tableAs else: table
 
-      if wes == "" and acc == "":
-        wesTo.add(" WHERE " & toUse & $deleteMarker)
+    if wes == "" and acc == "":
+      wesTo.add(" WHERE " & toUse & $deleteMarker)
 
-      elif acc != "":
-        accTo.add(" AND " & toUse & $deleteMarker)
+    elif acc != "":
+      accTo.add(" AND " & toUse & $deleteMarker)
 
-      else:
-        wesTo.add(" AND " & toUse & $deleteMarker)
+    else:
+      wesTo.add(" AND " & toUse & $deleteMarker)
 
     return (wesTo, accTo)
 
@@ -342,7 +358,7 @@ macro sqlSelectConst*(
   #
   var lef = ""
   if joinargs.len != 0:
-    lef = sqlSelectConstJoin(joinargs, jointype)
+    lef = sqlSelectConstJoin(joinargs, jointype, deleteMarkersFields, deleteMarker)
 
 
   #
@@ -364,7 +380,8 @@ macro sqlSelectConst*(
   #
   var (toWes, toAcc) = sqlSelectConstSoft(
       wes, acc,
-      tablesInQuery,
+      # tablesInQuery,
+      $table, $tableAs,
       deleteMarkersFields,
       useDeleteMarker, deleteMarker
     )
@@ -522,6 +539,12 @@ proc sqlSelect*(
           lef.add(" AND ")
         lef.add(join)
 
+      if d.table in deleteMarkersFields:
+        if d.tableAs != "":# and (d.tableAs & $deleteMarker) notin lef:
+          lef.add(" AND " & d.tableAs & $deleteMarker)
+        else:#if (d.table & $deleteMarker) notin lef:
+          lef.add(" AND " & d.table & $deleteMarker)
+
       lef.add(")")
 
   if joinoverride.len() > 0:
@@ -611,6 +634,12 @@ proc sqlSelect*(
         else:
           wes.add("? " & d)
 
+      # => x != y
+      elif d.len() >= 5 and d.contains(" != ") and d.split(" != ").len() == 2:
+        wes.add(d)
+
+      # !! Waring = pfl.action IN (2,3,4) <== not supported
+
       # => x = y
       elif d.len() >= 5 and d.contains(" = "):
         let eSplit = d.split(" = ")
@@ -696,11 +725,11 @@ proc sqlSelect*(
   # Soft delete
   #
   if useDeleteMarker and deleteMarkersFields.len() > 0:
-    for t in tablesInQuery:
-      if t.table notin deleteMarkersFields:
-        continue
+    # for t in tablesInQuery:
+    if table in deleteMarkersFields:
+      # continue
 
-      let toUse = if t.tableAs != "": t.tableAs else: t.table
+      let toUse = if tableAs != "": tableAs else: table
 
       if wes == "" and acc == "":
         wes.add(" WHERE " & toUse & $deleteMarker)

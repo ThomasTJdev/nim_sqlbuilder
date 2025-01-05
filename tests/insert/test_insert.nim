@@ -100,6 +100,14 @@ suite "insert - default":
     check querycompare(test, sql("INSERT INTO my-table (name, age, company, ident) VALUES (?, NULL, NULL, ?)"))
 
 
+
+  test "manual NULL":
+    var test: SqlQuery
+
+    test = sqlInsert("my-table", ["name", "age"], @["NULL", "30"])
+    check querycompare(test, sql("INSERT INTO my-table (name, age) VALUES (NULL, ?)"))
+
+
 suite "insert - macro":
 
   test "sqlInsert - default":
