@@ -74,7 +74,7 @@ proc sqlInsert*(table: string, data: varargs[string], args: seq[string] = @[]): 
     #
     # Check corresponding args
     if checkArgs:
-      if args[i].len() == 0:
+      if args[i].len() == 0 or args[i] == "NULL":
         vals.add("NULL")
       else:
         vals.add('?')
