@@ -93,6 +93,18 @@ suite "test sqlSelect":
     check string(test).count("?") == 6
 
 
+  test "WHERE statements: <=":
+    var test: SqlQuery
+    test = sqlSelect(
+      table     = "tasks",
+      select    = @["id", "name", "description", "created", "updated", "completed"],
+      where     = @["id =", "name !=", "updated <= NOW()", "completed IS", "description LIKE"],
+      useDeleteMarker = false
+    )
+    check querycompare(test, sql("SELECT id, name, description, created, updated, completed FROM tasks WHERE id = ? AND name != ? AND updated <= NOW() AND completed IS ? AND description LIKE ? "))
+
+
+
 
   test "WHERE statements: = ANY(...)":
     var test: SqlQuery
@@ -833,3 +845,4 @@ suite "catch bad formats":
       """
       )
     echo string(a)
+

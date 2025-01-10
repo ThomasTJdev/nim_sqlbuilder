@@ -156,27 +156,42 @@ proc sqlSelectConstWhere(where: varargs[string], usePrepared: NimNode): string =
           wes.add("? " & v)
 
       # => x = y
-      elif v.len() >= 5 and v.contains(" = "):
-        let eSplit = v.split(" = ")
-        # Value included already
-        if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
-          if boolVal(usePrepared):
-            wes.add(v)
+      elif v.len() >= 5 and (
+        v.contains(" = ") or
+        v.contains(" != ") or
+        v.contains(" >= ") or
+        v.contains(" <= ") or
+        v.contains(" <> ") or
+        v.contains(" > ") or
+        v.contains(" < ")
+      ):
+        const whereTypes = [" = ", " != ", " >= ", " <= ", " > ", " < "]
+        for wt in whereTypes:
+          if wt notin v:
+            continue
+
+          let eSplit = v.split(wt) #" = ")
+          # Value included already
+          if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
+            if boolVal(usePrepared):
+              wes.add(v)
+            else:
+              wes.add(v)
+          # If there's multiple elements
+          elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
+            if boolVal(usePrepared):
+              wes.add(v)
+            else:
+              wes.add(v)
+          # Insert ?
           else:
-            wes.add(v)
-        # If there's multiple elements
-        elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
-          if boolVal(usePrepared):
-            wes.add(v)
-          else:
-            wes.add(v)
-        # Insert ?
-        else:
-          if boolVal(usePrepared):
-            prepareCount += 1
-            wes.add(v & " $" & $prepareCount)
-          else:
-            wes.add(v & " ?")
+            if boolVal(usePrepared):
+              prepareCount += 1
+              wes.add(v & " $" & $prepareCount)
+            else:
+              wes.add(v & " ?")
+
+          break
 
       # => ... = ?
       else:
@@ -641,27 +656,42 @@ proc sqlSelect*(
       # !! Waring = pfl.action IN (2,3,4) <== not supported
 
       # => x = y
-      elif d.len() >= 5 and d.contains(" = "):
-        let eSplit = d.split(" = ")
-        # Value included already
-        if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
-          if usePrepared:
-            wes.add(d)
+      elif d.len() >= 5 and (
+        d.contains(" = ") or
+        d.contains(" != ") or
+        d.contains(" >= ") or
+        d.contains(" <= ") or
+        d.contains(" <> ") or
+        d.contains(" > ") or
+        d.contains(" < ")
+      ): #d.contains(" = "):
+        const whereTypes = [" = ", " != ", " >= ", " <= ", " > ", " < "]
+        for wt in whereTypes:
+          if wt notin d:
+            continue
+
+          let eSplit = d.split(wt)
+          # Value included already
+          if eSplit.len() == 2 and eSplit[0].strip().len() > 0 and eSplit[1].strip().len() > 0:
+            if usePrepared:
+              wes.add(d)
+            else:
+              wes.add(d)
+          # If there's multiple elements
+          elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
+            if usePrepared:
+              wes.add(d)
+            else:
+              wes.add(d)
+          # Insert ?
           else:
-            wes.add(d)
-        # If there's multiple elements
-        elif eSplit.len() > 2 and eSplit[eSplit.high].len() > 1:
-          if usePrepared:
-            wes.add(d)
-          else:
-            wes.add(d)
-        # Insert ?
-        else:
-          if usePrepared:
-            prepareCount += 1
-            wes.add(d & " $" & $prepareCount)
-          else:
-            wes.add(d & " ?")
+            if usePrepared:
+              prepareCount += 1
+              wes.add(d & " $" & $prepareCount)
+            else:
+              wes.add(d & " ?")
+
+          break
 
       # => ... = ?
       else:
