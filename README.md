@@ -551,6 +551,21 @@ The `totypes` module contains procs to convert the result to types.
 type
   Person = ref object
     id: int
+    username: string
+    age: int
+    secretIdent: string
+    is_nimmer: bool
+
+let
+  columns = @["name AS username","id","ident AS secretIdent"]
+  val = db.getRow(sql("SELECT " & columns.join(",") & " FROM my_table WHERE id = 1"))
+  res = sqlToTypeAs(Person, columns, val)
+```
+
+```nim
+type
+  Person = ref object
+    id: int
     name: string
     age: int
     ident: string

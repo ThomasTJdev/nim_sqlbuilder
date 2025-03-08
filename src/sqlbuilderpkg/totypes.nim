@@ -64,3 +64,24 @@ proc sqlToType*[T](t: typedesc[T], columns: seq[string], vals: seq[seq[string]])
   for v in vals:
     result.add(sqlToType(t, columns, v))
   return result
+
+
+proc sqlToTypeAs*[T](t: typedesc[T], columns, val: seq[string]): T =
+  let tmp = t()
+
+  for fieldName, field in tmp[].fieldPairs:
+    var
+      found = false
+    for ci in 0..columns.high:
+      let cSplit = columns[ci].toLowerAscii().split(" as ")
+      if cSplit.len() == 2:
+        if cSplit[1].strip() == fieldName:
+          parseVal(val[ci], field)
+          found = true
+          break
+    if not found:
+      parseVal(field)
+    else:
+      found = false
+
+  return tmp
