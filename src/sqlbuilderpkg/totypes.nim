@@ -73,7 +73,7 @@ proc sqlToTypeAs*[T](t: typedesc[T], columns, val: seq[string]): T =
     var
       found = false
     for ci in 0..columns.high:
-      let cSplit = columns[ci].toLowerAscii().split(" as ")
+      let cSplit = if columns[ci].contains(" as "): columns[ci].split(" as ") else: columns[ci].split(" AS ")
       if cSplit.len() == 2:
         if cSplit[1].strip() == fieldName:
           parseVal(val[ci], field)
