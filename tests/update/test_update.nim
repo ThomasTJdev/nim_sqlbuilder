@@ -84,6 +84,36 @@ suite "update - queries":
 
 
 
+  test "update value where x IS NULL":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age"],
+      ["id =", "info IS NULL"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ? WHERE id = ? AND info IS NULL"))
+
+
+
+  test "update value where x OR y IS NULL":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age"],
+      ["id =", "(info IS NULL OR notty IS NULL)"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ? WHERE id = ? AND (info IS NULL OR notty IS NULL)"))
+
+
+
+  test "update value where x IS NULL OR y IS FALSE":
+    let q = sqlUpdate(
+      "table",
+      ["name", "age"],
+      ["id =", "(info IS NULL OR notty IS FALSE)"],
+    )
+    check querycompare(q, sql("UPDATE table SET name = ?, age = ? WHERE id = ? AND (info IS NULL OR notty IS FALSE)"))
+
+
+
   test "update value with spaces":
     let q = sqlUpdate(
       "table",
