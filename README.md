@@ -1,4 +1,4 @@
-*This readme is generated with [Nim to Markdown](https://github.com/ThomasTJdev/nimtomd)*
+**⚠️ Not actively maintained - moved to https://github.com/ThomasTJdev/nim_sqlquery ⚠️**
 
 
 # SQL builder
